@@ -13,7 +13,7 @@ $stats = [
   [(int)val('SELECT COUNT(*) FROM users WHERE role="teacher"') ?: 1, 'Teachers'],
 ];
 $me = user();
-$teachers = all('SELECT u.id,u.name,tp.photo,tp.headline,tp.years,(SELECT COUNT(*) FROM courses c WHERE c.teacher_id=u.id AND c.published=1) cc FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.active=1 AND u.role IN ("teacher","admin") AND tp.public=1 ORDER BY cc DESC, u.id LIMIT 8');
+$teachers = all('SELECT u.id,u.name,tp.photo,tp.headline,tp.years,(SELECT COUNT(*) FROM courses c WHERE c.teacher_id=u.id AND c.published=1) cc FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.active=1 AND u.role IN ("teacher","admin") AND tp.public=1 ORDER BY cc DESC, u.id LIMIT 12');
 $canReg = setting('allow_register', '1') === '1';
 $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 ?><!doctype html>
