@@ -10,4 +10,5 @@
   <label>Password<input name="password" type="password" minlength="6" required></label>
   <button class="btn block">Sign up</button>
   <p class="center">Already have an account? <a href="?p=login">Sign in</a></p>
+  <p class="center"><a href="./">← Back to website</a></p>
 </form>

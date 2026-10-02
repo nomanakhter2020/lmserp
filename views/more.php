@@ -8,6 +8,7 @@ $items = [
   ['expenses', '📉', 'Expenses', role('admin')],
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
+  ['site', '🌐', 'Website', true],
   ['profile', '👤', 'My profile', true],
 ];
 ?>

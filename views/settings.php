@@ -6,6 +6,12 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
 <form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="settings_save">
   <label>Institute name<input name="institute" value="<?= e(setting('institute')) ?>" required></label>
   <label>Contact phone<input name="phone" value="<?= e(setting('phone')) ?>"></label>
+  <h3>Public website</h3>
+  <label>Headline<input name="site_tagline" value="<?= e(setting('site_tagline')) ?>" placeholder="Learn new skills online, at your own pace"></label>
+  <label>About (hero text)<textarea name="site_about" rows="3" placeholder="Short intro about your institute"><?= e(setting('site_about')) ?></textarea></label>
+  <div class="two"><label>WhatsApp<input name="site_whatsapp" value="<?= e(setting('site_whatsapp')) ?>" placeholder="0300-1234567"></label><label>Email<input name="site_email" type="email" value="<?= e(setting('site_email')) ?>"></label></div>
+  <label>Address<input name="site_address" value="<?= e(setting('site_address')) ?>"></label>
+  <p><a href="?p=site" target="_blank">🌐 View website ›</a></p>
   <h3>Payment details shown to students</h3>
   <label>Bank account<textarea name="pay_bank" rows="2" placeholder="Meezan Bank · Title · IBAN"><?= e(setting('pay_bank')) ?></textarea></label>
   <label>JazzCash<input name="pay_jazzcash" value="<?= e(setting('pay_jazzcash')) ?>" placeholder="0300-1234567 · Account title"></label>

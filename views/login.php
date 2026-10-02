@@ -8,4 +8,5 @@
   <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
   <button class="btn block">Sign in</button>
   <?php if (setting('allow_register', '1') === '1'): ?><p class="center">New student? <a href="?p=register">Create account</a></p><?php endif ?>
+  <p class="center"><a href="./">← Back to website</a></p>
 </form>
