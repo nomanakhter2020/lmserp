@@ -1,0 +1,75 @@
+<?php
+$me = user(); $title = 'Hi, ' . explode(' ', $me['name'])[0];
+$ann = all('SELECT a.*,c.title ct FROM announcements a LEFT JOIN courses c ON c.id=a.course_id
+  WHERE a.course_id IS NULL OR a.course_id IN (SELECT course_id FROM enrollments WHERE user_id=?) OR a.course_id IN (SELECT id FROM courses WHERE teacher_id=?) OR ?
+  ORDER BY a.id DESC LIMIT 3', [$me['id'], $me['id'], role('admin') ? 1 : 0]);
+
+if (role('admin')):
+  $m = date('Y-m');
+  $s = [
+    'Students' => val('SELECT COUNT(*) FROM users WHERE role="student" AND active=1'),
+    'Teachers' => val('SELECT COUNT(*) FROM users WHERE role="teacher" AND active=1'),
+    'Courses' => val('SELECT COUNT(*) FROM courses'),
+    'Pending' => val('SELECT COUNT(*) FROM enrollments WHERE status="pending"'),
+  ];
+  $inc = (float)val('SELECT COALESCE(SUM(amount),0) FROM payments WHERE DATE_FORMAT(paid_on,"%Y-%m")=?', [$m]);
+  $exp = (float)val('SELECT COALESCE(SUM(amount),0) FROM expenses WHERE DATE_FORMAT(spent_on,"%Y-%m")=?', [$m]);
+  $recent = all('SELECT p.*,u.name FROM payments p JOIN users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 5');
+  $pending = all('SELECT e.*,u.name,c.title,c.fee FROM enrollments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id WHERE e.status="pending" ORDER BY e.id DESC LIMIT 5');
+?>
+<div class="hero">
+  <div class="muted-l"><?= date('F Y') ?></div>
+  <div class="big"><?= money($inc - $exp) ?></div><div class="muted-l">Net this month</div>
+  <div class="split"><div><b><?= money($inc) ?></b><span>Fees in</span></div><div><b><?= money($exp) ?></b><span>Expenses</span></div></div>
+</div>
+<div class="stats"><?php foreach ($s as $k => $v): ?><div class="stat"><b><?= (int)$v ?></b><span><?= $k ?></span></div><?php endforeach ?></div>
+<div class="quick">
+  <a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
+</div>
+<?php if ($pending): ?>
+<h2>Pending enrollments</h2>
+<div class="list"><?php foreach ($pending as $r): ?>
+  <a class="row" href="?p=user&id=<?= $r['user_id'] ?>"><div><b><?= e($r['name']) ?></b><small><?= e($r['title']) ?> · <?= money($r['fee']) ?></small></div><span class="pill warn">Pending</span></a>
+<?php endforeach ?></div>
+<?php endif ?>
+<h2>Recent fees</h2>
+<div class="list"><?php foreach ($recent as $r): ?>
+  <div class="row"><div><b><?= e($r['name']) ?></b><small><?= e($r['paid_on']) ?> · <?= e($r['method']) ?></small></div><b class="pos"><?= money($r['amount']) ?></b></div>
+<?php endforeach; if (!$recent): ?><p class="empty">No payments yet</p><?php endif ?></div>
+
+<?php elseif (role('teacher')):
+  $cs = all('SELECT c.*,(SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) st,(SELECT COUNT(*) FROM lessons l WHERE l.course_id=c.id) ls FROM courses c WHERE teacher_id=? ORDER BY c.id DESC', [$me['id']]);
+  $tot = array_sum(array_column($cs, 'st'));
+?>
+<div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>My courses</span></div><div class="stat"><b><?= $tot ?></b><span>Students</span></div></div>
+<div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=announcements">📣 Announce</a></div>
+<h2>My courses</h2>
+<div class="grid"><?php foreach ($cs as $c): ?>
+  <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>"><div class="band"></div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= $c['st'] ?> students</small></a>
+<?php endforeach; if (!$cs): ?><p class="empty">No courses yet. Create your first one.</p><?php endif ?></div>
+
+<?php else:
+  $cs = all('SELECT c.*,e.status FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ORDER BY e.id DESC', [$me['id']]);
+  $done = (int)val('SELECT COUNT(*) FROM progress WHERE user_id=?', [$me['id']]);
+  $avg = val('SELECT ROUND(AVG(score*100/NULLIF(total,0))) FROM attempts WHERE user_id=?', [$me['id']]);
+  $paid = (float)val('SELECT COALESCE(SUM(amount),0) FROM payments WHERE user_id=?', [$me['id']]);
+  $cont = null;
+  foreach ($cs as $c) { if ($c['status'] === 'active' && course_progress((int)$me['id'], (int)$c['id']) < 100) { $cont = $c; break; } }
+?>
+<div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>Courses</span></div><div class="stat"><b><?= $done ?></b><span>Lessons done</span></div><div class="stat"><b><?= $avg !== null ? $avg . '%' : '–' ?></b><span>Quiz avg</span></div></div>
+<?php if ($cont): $pc = course_progress((int)$me['id'], (int)$cont['id']);
+  $nx = val('SELECT l.id FROM lessons l LEFT JOIN progress p ON p.lesson_id=l.id AND p.user_id=? WHERE l.course_id=? AND p.lesson_id IS NULL ORDER BY l.sort,l.id LIMIT 1', [$me['id'], $cont['id']]); ?>
+<a class="hero" href="<?= $nx ? "?p=lesson&id=$nx" : "?p=course&id={$cont['id']}" ?>" style="--c:<?= e($cont['color']) ?>">
+  <div class="muted-l">Continue learning</div><div class="big sm"><?= e($cont['title']) ?></div>
+  <div class="bar light"><i style="width:<?= $pc ?>%"></i></div><div class="muted-l"><?= $pc ?>% complete · Resume ›</div>
+</a>
+<?php endif ?>
+<div class="quick"><a href="?p=courses">🔎 Browse courses</a><a href="?p=fees">💳 My fees (<?= money($paid) ?>)</a></div>
+<?php endif ?>
+
+<?php if ($ann): ?>
+<h2>Announcements</h2>
+<div class="list"><?php foreach ($ann as $a): ?>
+  <div class="row col"><b><?= e($a['title']) ?></b><small><?= e($a['ct'] ?: 'Everyone') ?> · <?= date('d M', strtotime($a['created_at'])) ?></small><p><?= nl2br(e($a['body'])) ?></p></div>
+<?php endforeach ?></div>
+<?php endif ?>
