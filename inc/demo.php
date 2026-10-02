@@ -1,18 +1,32 @@
 <?php
 // Demo data: 3 teachers with full CVs, photos, a course each with lessons & a quiz.
 // Idempotent: keyed by demo emails, safe to run twice.
-function demo_fetch_photo(string $url): string {
-    $data = false;
+$GLOBALS['demo_err'] = [];
+function demo_get(string $url) {
+    $data = false; $err = '';
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 25, CURLOPT_USERAGENT => 'Mozilla/5.0']);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            CURLOPT_HTTPHEADER => ['Accept: image/avif,image/webp,image/png,image/*,*/*;q=0.8', 'Referer: https://www.magnific.com/']]);
         $data = curl_exec($ch);
-        if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $data = false;
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($data === false) $err = curl_error($ch); elseif ($code !== 200) { $err = "HTTP $code"; $data = false; }
         curl_close($ch);
-    } else {
-        $data = @file_get_contents($url);
     }
-    if (!$data || !function_exists('imagecreatefromstring') || !($im = @imagecreatefromstring($data))) return '';
+    if ($data === false && ini_get('allow_url_fopen')) {
+        $ctx = stream_context_create(['http' => ['timeout' => 40, 'header' => "User-Agent: Mozilla/5.0\r\nReferer: https://www.magnific.com/\r\n"]]);
+        $d = @file_get_contents($url, false, $ctx);
+        if ($d !== false) { $data = $d; $err = ''; }
+    }
+    if ($data === false) $GLOBALS['demo_err'][] = $err ?: 'download blocked';
+    elseif (!function_exists('imagecreatefromstring')) { $GLOBALS['demo_err'][] = 'GD extension missing'; return false; }
+    return $data;
+}
+
+function demo_fetch_photo(string $url): string {
+    $data = demo_get($url);
+    if (!$data || !($im = @imagecreatefromstring($data))) return '';
     $w = imagesx($im); $h = imagesy($im); $s = min($w, $h);
     $out = imagecreatetruecolor(600, 600);
     imagecopyresampled($out, $im, 0, 0, (int)(($w - $s) / 2), (int)(($h - $s) / 2), 600, 600, $s, $s);
@@ -225,15 +239,8 @@ function demo_seed(): array {
 }
 
 function demo_fetch_cover(string $url): string {
-    $data = false;
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 25, CURLOPT_USERAGENT => 'Mozilla/5.0']);
-        $data = curl_exec($ch);
-        if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $data = false;
-        curl_close($ch);
-    } else $data = @file_get_contents($url);
-    if (!$data || !function_exists('imagecreatefromstring') || !($im = @imagecreatefromstring($data))) return '';
+    $data = demo_get($url);
+    if (!$data || !($im = @imagecreatefromstring($data))) return '';
     $w = imagesx($im); $h = imagesy($im);
     if ($w > 1280) { $nh = (int)round($h * 1280 / $w); $r = imagecreatetruecolor(1280, $nh); imagecopyresampled($r, $im, 0, 0, 0, 0, 1280, $nh, $w, $h); $im = $r; }
     if (!is_dir(UPLOAD_DIR . '/covers')) mkdir(UPLOAD_DIR . '/covers', 0750, true);
