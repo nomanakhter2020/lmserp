@@ -151,6 +151,11 @@ if ($isPost) {
             flash('Announcement posted'); redirect($cid ? "?p=course&id=$cid" : '?p=announcements');
         case 'announce_delete':
             require_role('admin'); q('DELETE FROM announcements WHERE id=?', [$id]); redirect('?p=announcements');
+        case 'demo_seed':
+            require_role('admin');
+            require __DIR__ . '/inc/demo.php';
+            flash('Demo teachers ready: ' . implode(', ', demo_seed()));
+            redirect('?p=users&role=teacher');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':

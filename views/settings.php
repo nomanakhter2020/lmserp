@@ -26,3 +26,7 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
   <form method="post" onsubmit="return confirm('Delete category?')"><?= csrf_field() ?><input type="hidden" name="a" value="category_delete"><input type="hidden" name="id" value="<?= $c['id'] ?>"><button class="x">✕</button></form></div>
 <?php endforeach ?></div>
 <form method="post" class="card inline"><?= csrf_field() ?><input type="hidden" name="a" value="category_add"><input name="name" placeholder="New category" required><button class="btn sm">Add</button></form>
+<h2>Demo data</h2>
+<form method="post" class="card" onsubmit="return confirm('Add 3 demo teachers with CVs, photos and a course each?')"><?= csrf_field() ?><input type="hidden" name="a" value="demo_seed">
+  <p class="muted">Adds 3 sample teachers (Maths, English/IELTS, Web Development) with full CV profiles, photos, and one course each with lessons and a quiz. Safe to run again — nothing is duplicated.</p>
+  <button class="btn block ghost">👩‍🏫 Load demo teachers</button></form>
