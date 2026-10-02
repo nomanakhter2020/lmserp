@@ -1,6 +1,7 @@
 <?php
 $title = 'More';
 $items = [
+  ['teachers', '👩‍🏫', 'Our teachers', true],
   ['announcements', '📣', 'Announcements', true],
   ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
   ['fees', '💳', 'My fees', role('student')],

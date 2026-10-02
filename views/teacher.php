@@ -26,7 +26,7 @@ $photo = photo_url($pr['photo']);
 </head><body class="cvpage">
 <header class="nav scrolled"><div class="container nav-in">
   <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
-  <div class="cv-actions"><a class="btn-o sm" href="./#teachers">← All teachers</a><?php if ($own): ?><a class="btn sm" href="?p=tprofile&id=<?= $t['id'] ?>">✏️ Edit</a><?php endif ?></div>
+  <div class="cv-actions"><a class="btn-o sm" href="<?= $me ? '?p=teachers' : './#teachers' ?>">← All teachers</a><?php if ($own): ?><a class="btn sm" href="?p=tprofile&id=<?= $t['id'] ?>">✏️ Edit</a><?php endif ?></div>
 </div></header>
 
 <main class="container cv">

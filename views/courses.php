@@ -24,3 +24,4 @@ $cats = all('SELECT * FROM categories ORDER BY name');
 <?php endforeach ?>
 </div>
 <?php if (!$cs): ?><p class="empty">No courses found</p><?php endif ?>
+<?php if (!$s && !$cat) require __DIR__ . '/_teachers_strip.php'; ?>

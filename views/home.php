@@ -68,6 +68,7 @@ if (role('admin')):
 <div class="quick"><a href="?p=courses">🔎 Browse courses</a><a href="?p=fees">💳 My fees (<?= money($paid) ?>)</a></div>
 <?php endif ?>
 
+<?php require __DIR__ . '/_teachers_strip.php'; ?>
 <?php if ($ann): ?>
 <h2>Announcements</h2>
 <div class="list"><?php foreach ($ann as $a): ?>
