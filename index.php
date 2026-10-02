@@ -177,6 +177,7 @@ if ($p === 'proof_file') {
 // Public website: guests landing on the root URL, or anyone via ?p=site
 if (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site') { require __DIR__ . '/views/landing.php'; exit; }
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
+if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register'], true)) require_login();
 
 $view = __DIR__ . "/views/$p.php";

@@ -12,8 +12,9 @@ $stats = [
   [(int)val('SELECT COUNT(*) FROM lessons'), 'Video lessons'],
   [(int)val('SELECT COUNT(*) FROM users WHERE role="teacher"') ?: 1, 'Teachers'],
 ];
+$me = user();
 $canReg = setting('allow_register', '1') === '1';
-$cta = $canReg ? '?p=register' : '?p=login';
+$cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -31,9 +32,10 @@ $cta = $canReg ? '?p=register' : '?p=login';
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
       <a href="#courses">Courses</a><a href="#why">Why us</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#contact">Contact</a>
-      <a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>"><?= $canReg ? 'Enroll now' : 'Log in' ?></a>
+      <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a>
+      <?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>"><?= $canReg ? 'Enroll now' : 'Log in' ?></a><?php endif ?>
     </nav>
-    <div class="nav-cta"><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?></div>
+    <div class="nav-cta"><?php if ($me): ?><a class="btn" href="?p=home">My dashboard →</a><?php else: ?><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?><?php endif ?></div>
     <button class="burger" aria-label="Menu" onclick="document.body.classList.toggle('open')"><span></span><span></span><span></span></button>
   </div>
 </header>
@@ -108,7 +110,7 @@ $cta = $canReg ? '?p=register' : '?p=login';
       <div class="step"><b>2</b><h3>Choose a course &amp; pay</h3><p>Enroll, pay the fee and upload your payment screenshot.</p></div>
       <div class="step"><b>3</b><h3>Start learning</h3><p>Once verified, your course unlocks — watch, practise, pass.</p></div>
     </div>
-    <div class="center"><a class="btn lg" href="<?= $cta ?>">Create free account →</a></div>
+    <div class="center"><a class="btn lg" href="<?= $cta ?>"><?= $me ? 'Browse courses →' : 'Create free account →' ?></a></div>
   </div>
 </section>
 
@@ -140,7 +142,7 @@ $cta = $canReg ? '?p=register' : '?p=login';
 
 <footer class="foot"><div class="container foot-in">
   <a class="brand" href="#top"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
-  <nav><a href="#courses">Courses</a><a href="#faq">FAQ</a><a href="#contact">Contact</a><a href="?p=login">Student login</a></nav>
+  <nav><a href="#courses">Courses</a><a href="#faq">FAQ</a><a href="#contact">Contact</a><a href="?p=<?= $me ? 'home' : 'login' ?>"><?= $me ? 'My dashboard' : 'Student login' ?></a></nav>
   <small>© <?= date('Y') ?> <?= e($inst) ?>. All rights reserved.</small>
 </div></footer>
 
