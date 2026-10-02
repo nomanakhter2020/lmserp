@@ -84,3 +84,17 @@ body.auth{min-height:100vh;display:grid;place-items:center;padding:20px;backgrou
 .authcard{width:100%;max-width:400px;padding:26px 22px}.authcard h1{text-align:center}.logo{text-align:center}.logo img{width:64px;height:64px}
 @media print{.top,nav.bottom,.pager,.alert{display:none!important}.app{padding:0}.card{box-shadow:none;border:0}}
 @media (min-width:760px){nav.bottom{max-width:720px;margin:0 auto;border:1px solid var(--ln);border-bottom:0;border-radius:18px 18px 0 0}}
+/* custom YouTube player: keeps users inside the app */
+.yt{position:relative;padding-top:56.25%;border-radius:var(--r);overflow:hidden;background:#000 center/cover no-repeat;margin:0 0 12px;user-select:none}
+.yt-frame{position:absolute;inset:0;overflow:hidden}.yt-frame iframe{position:absolute;left:0;top:-60px;width:100%;height:calc(100% + 120px);border:0;pointer-events:none}
+.yt-shield{position:absolute;inset:0;z-index:2}
+.yt.paused .yt-shield{background:rgba(0,0,0,.35)}
+.yt-big{position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:66px;height:66px;border-radius:50%;border:0;background:var(--p);color:#fff;font-size:26px;padding-left:5px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.yt:not(.paused) .yt-big{display:none}
+.yt-bar{position:absolute;z-index:3;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;font-size:12px;transition:opacity .25s}
+.yt.idle:not(.paused) .yt-bar{opacity:0}
+.yt-bar button{background:none;border:0;color:#fff;font-size:16px;padding:4px;cursor:pointer;min-width:28px}
+.yt-seek{flex:1;margin:0;padding:0;height:4px;accent-color:var(--p);background:transparent;border:0}
+.yt:fullscreen,.yt.fs{padding-top:0;border-radius:0}
+.yt.fs{position:fixed;inset:0;z-index:50;margin:0}
+.yt:fullscreen .yt-frame iframe,.yt.fs .yt-frame iframe{top:-60px}

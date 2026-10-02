@@ -5,7 +5,7 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 
 function cfg(): ?array {
@@ -60,9 +60,8 @@ function require_role(...$r) { require_login(); if (!role(...$r)) { http_respons
 
 function setting(string $k, $d = '') { $v = val('SELECT v FROM settings WHERE k=?', [$k]); return $v === false ? $d : $v; }
 
-function youtube_embed(string $url): ?string {
-    if (preg_match('~(?:youtu\.be/|v=|embed/|shorts/)([\w-]{11})~', $url, $m)) return 'https://www.youtube.com/embed/' . $m[1];
-    return null;
+function youtube_id(string $url): ?string {
+    return preg_match('~(?:youtu\.be/|v=|embed/|shorts/|live/)([\w-]{11})~', $url, $m) ? $m[1] : null;
 }
 
 function course_progress(int $uid, int $cid): int {

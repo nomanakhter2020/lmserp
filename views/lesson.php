@@ -10,11 +10,23 @@ $all = all('SELECT id FROM lessons WHERE course_id=? ORDER BY sort,id', [$l['cou
 $ids = array_column($all, 'id'); $pos = array_search($l['id'], $ids);
 $prev = $ids[$pos - 1] ?? null; $next = $ids[$pos + 1] ?? null;
 $done = val('SELECT 1 FROM progress WHERE user_id=? AND lesson_id=?', [$me['id'], $id]);
-$yt = $l['video_url'] ? youtube_embed($l['video_url']) : null;
+$yt = $l['video_url'] ? youtube_id($l['video_url']) : null;
 ?>
 <div class="crumb"><?= e($l['ctitle']) ?> · Lesson <?= $pos + 1 ?> of <?= count($ids) ?></div>
 <?php if ($yt): ?>
-  <div class="video"><iframe src="<?= e($yt) ?>" allowfullscreen allow="accelerometer; autoplay; encrypted-media; picture-in-picture"></iframe></div>
+  <div class="yt" data-yt="<?= e($yt) ?>">
+    <div class="yt-frame"><div id="ytp"></div></div>
+    <div class="yt-shield"></div>
+    <button class="yt-big" aria-label="Play">▶</button>
+    <div class="yt-bar">
+      <button class="yt-pp" aria-label="Play/Pause">▶</button>
+      <span class="yt-t">0:00</span>
+      <input class="yt-seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+      <span class="yt-d">0:00</span>
+      <button class="yt-sp" aria-label="Speed">1x</button>
+      <button class="yt-fs" aria-label="Fullscreen">⛶</button>
+    </div>
+  </div>
 <?php elseif ($l['video_url']): ?>
   <div class="video"><video src="<?= e($l['video_url']) ?>" controls playsinline></video></div>
 <?php endif ?>
