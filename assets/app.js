@@ -1,11 +1,26 @@
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+// ---- install app: native prompt when available, otherwise device-specific instructions ----
 let deferred;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault(); deferred = e;
-  const h = document.querySelector('.install-hint'); if (h) h.hidden = false;
-});
-document.addEventListener('click', e => {
-  if (e.target.id === 'installBtn' && deferred) { deferred.prompt(); deferred = null; }
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const ua = navigator.userAgent;
+const os = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios'
+  : /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)|TikTok/i.test(ua) ? 'inapp'
+  : /Android/i.test(ua) ? 'android' : 'desktop';
+const hint = document.querySelector('.install-hint');
+if (hint && !standalone) {
+  hint.hidden = false;
+  document.getElementById('installBtn').textContent = os === 'desktop' ? '💻 Install app on this computer' : '📲 Install app on this phone';
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; });
+window.addEventListener('appinstalled', () => { if (hint) hint.hidden = true; deferred = null; });
+document.addEventListener('click', async e => {
+  if (e.target.id === 'installBtn') {
+    if (deferred) { deferred.prompt(); const r = await deferred.userChoice; deferred = null; if (r.outcome === 'accepted' && hint) hint.hidden = true; return; }
+    const sh = document.getElementById('installSheet');
+    sh.querySelectorAll('[data-os]').forEach(d => d.hidden = d.dataset.os !== os);
+    sh.hidden = false;
+  }
+  if (e.target.id === 'sheetClose' || e.target.id === 'installSheet') document.getElementById('installSheet').hidden = true;
 });
 // prevent double submits
 document.addEventListener('submit', e => {
