@@ -155,12 +155,13 @@ if ($isPost) {
             require_role('admin');
             require __DIR__ . '/inc/demo.php';
             @set_time_limit(300);
-            $t = demo_seed(); $it = demo_it_seed();
+            $t = demo_seed(); $it = demo_it_seed(); demo_covers_seed();
             $nt = (int)val('SELECT COUNT(*) FROM users WHERE email LIKE "%@demo.lms"');
             $nc = (int)val('SELECT COUNT(*) FROM courses c JOIN users u ON u.id=c.teacher_id WHERE u.email LIKE "%@demo.lms"');
             $np = (int)val('SELECT COUNT(*) FROM teacher_profiles tp JOIN users u ON u.id=tp.user_id WHERE u.email LIKE "%@demo.lms" AND tp.photo<>""');
+            $nv = (int)val('SELECT COUNT(*) FROM courses c JOIN users u ON u.id=c.teacher_id WHERE u.email LIKE "%@demo.lms" AND c.cover<>""');
             $errs = array_unique($GLOBALS['demo_err'] ?? []);
-            flash("Demo loaded: $nt teachers, $nc courses, $np photos." . ($errs ? ' Image download problem: ' . implode('; ', $errs) : ''), $errs ? 'warn' : 'ok');
+            flash("Demo loaded: $nt teachers, $nc courses, $np photos, $nv course covers." . ($errs ? ' Image download problem: ' . implode('; ', $errs) : ''), $errs ? 'warn' : 'ok');
             redirect('?p=users&role=teacher');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');

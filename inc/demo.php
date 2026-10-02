@@ -327,3 +327,31 @@ function demo_it_seed(): array {
     }
     return $log;
 }
+
+// Attach cover images to demo courses that don't have one yet (also retries failed downloads)
+function demo_covers_seed(): int {
+    $B = 'https://pikaso.cdnpk.net/private/production/';
+    $map = [
+        'Mathematics for Entry Tests' => '5618756157/render.png?token=exp=1791331200~hmac=242b533c2bb9c01a15438251971e2a7f78c52fdfcc3f7341fd063175cb9b0826',
+        'IELTS Preparation Complete Course' => '5618756173/render.jpg?token=exp=1791331200~hmac=94a9d6ae5c41d082509fc036e0453d2e68f1fbbc37433174ab140f2afbb3c131',
+        'FSc Physics Part 1 — Complete' => '5618756666/render.png?token=exp=1791331200~hmac=ad81f4630b630a3e72d72d0ab397601dbe47640c5d85c88c2a940995e9caf4d7',
+        'Organic Chemistry Made Easy' => '5618757363/render.png?token=exp=1791331200~hmac=6d479f66e5c00fc594b64b95ec9f66f9b19e954f7eb3da8a1f05c39cfabbeb21',
+        'MDCAT Biology Crash Course' => '5618757596/render.png?token=exp=1791331200~hmac=ac0eb0d57add05aacc8e03da04e9adeaa5d3cd789b300dd4c524adbc4ee1e4ad',
+        'Urdu Grammar & Essay Writing' => '5618758439/render.png?token=exp=1791331200~hmac=2eeb7686f1d161bdcec92a2c42344376c98d02156921586e2d471ed2dc82549e',
+        'Practical Accounting for Beginners' => '5618758407/render.png?token=exp=1791331200~hmac=6dc98c81ef47d0ea561671feb66b0614f84835f5533992d59fea1600f25358d1',
+        'Quran with Tajweed — Beginners' => '5618758597/render.png?token=exp=1791331200~hmac=dd01ae9fe65bf82895ef33c917d926cb8c65345ed5ca056907a61416c5c6d1fe',
+        'Phonics & Early Reading for Kids' => '5618760031/render.png?token=exp=1791331200~hmac=35811c5920cfacc1b7e92e6da488e1c31f80f02c1ab2c0aa5b34a36e13714d2e',
+        'Web Development from Zero' => '5618662330/render.png?token=exp=1791331200~hmac=3257a613194de5d5501850b586297aa3ab308605a28e37b663372a1159cad9a2',
+        'Python Programming for Beginners' => '5618661596/render.png?token=exp=1791331200~hmac=90a1875c46067eafceb1b164ae3b2e50f018ef8c47db20ae3a9dff296963b8e9',
+        'Computer Basics & MS Office' => '5618662540/render.png?token=exp=1791331200~hmac=4510980c88e8424bbaee7400a6e7cbb86f485485ca2c7db81f9f972d938072da',
+        'Graphic Design with Canva & Photoshop' => '5618662376/render.png?token=exp=1791331200~hmac=edbe9781b30fd2e4ba2831fd33616968a74575729a2f39da1d4aa00807589f90',
+        'Digital Marketing & Freelancing' => '5618663537/render.png?token=exp=1791331200~hmac=79a8b425a52da825307646591b0e55246ab92a9e89c3fc9284187ac57134e097',
+    ];
+    $n = 0;
+    foreach ($map as $title => $path) {
+        foreach (all('SELECT id FROM courses WHERE title=? AND (cover IS NULL OR cover="")', [$title]) as $c) {
+            if ($cv = demo_fetch_cover($B . $path)) { q('UPDATE courses SET cover=? WHERE id=?', [$cv, $c['id']]); $n++; }
+        }
+    }
+    return $n;
+}
