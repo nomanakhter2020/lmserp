@@ -2,9 +2,10 @@
 $title = 'More';
 $items = [
   ['announcements', '📣', 'Announcements', true],
+  ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
   ['fees', '💳', 'My fees', role('student')],
   ['enrollments', '📝', 'Enrollments', role('admin', 'teacher')],
-  ['expenses', '🧾', 'Expenses', role('admin')],
+  ['expenses', '📉', 'Expenses', role('admin')],
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
   ['profile', '👤', 'My profile', true],

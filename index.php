@@ -2,6 +2,7 @@
 require __DIR__ . '/inc/core.php';
 if (!cfg()) redirect('install.php');
 check_csrf();
+migrate();
 
 $p = preg_replace('/[^a-z_]/', '', (string)get('p', 'home'));
 $id = (int)($_POST['id'] ?? get('id', 0));
@@ -103,6 +104,32 @@ if ($isPost) {
             q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [(int)post('user_id'), (int)post('course_id') ?: null, (float)post('amount'), post('method', 'Cash'), post('note'), post('paid_on', date('Y-m-d')), $me['id']]);
             if (post('activate') && (int)post('course_id')) q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [(int)post('user_id'), (int)post('course_id')]);
             flash('Payment recorded'); redirect(post('back', '?p=fees'));
+        case 'proof_submit':
+            $c = one('SELECT * FROM courses WHERE id=?', [$id]);
+            $en = $c ? one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]) : null;
+            if (!$en) redirect('?p=courses');
+            $method = in_array(post('method'), ['Bank', 'JazzCash', 'EasyPaisa', 'Cash'], true) ? post('method') : 'Bank';
+            try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=course&id=$id"); }
+            if ($method !== 'Cash' && !$proof && post('txn_ref') === '') { flash('Upload a screenshot or enter the transaction ID', 'err'); redirect("?p=course&id=$id"); }
+            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note) VALUES(?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', $c['fee']), $method, post('txn_ref'), $proof, post('note')]);
+            flash($method === 'Cash' ? 'Noted. Pay cash at the office; admin will unlock the course.' : 'Payment proof sent. You will get access once the admin verifies it.');
+            redirect("?p=course&id=$id");
+        case 'proof_review':
+            require_role('admin');
+            $r = one('SELECT * FROM payment_requests WHERE id=? AND status="pending"', [$id]);
+            if (!$r) redirect('?p=proofs');
+            if (post('decision') === 'approve') {
+                $amt = (float)post('amount', $r['amount']);
+                q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$r['user_id'], $r['course_id'], $amt, $r['method'], ($r['txn_ref'] ? 'Ref ' . $r['txn_ref'] : ($r['method'] === 'Cash' ? 'Cash at office' : 'Online proof')), date('Y-m-d'), $me['id']]);
+                $pid = db()->lastInsertId();
+                q('UPDATE payment_requests SET status="approved",amount=?,payment_id=?,admin_note=? WHERE id=?', [$amt, $pid, post('admin_note'), $id]);
+                q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [$r['user_id'], $r['course_id']]);
+                flash('Approved — payment recorded and course unlocked');
+            } else {
+                q('UPDATE payment_requests SET status="rejected",admin_note=? WHERE id=?', [post('admin_note'), $id]);
+                flash('Request rejected');
+            }
+            redirect('?p=proofs');
         case 'payment_delete':
             require_role('admin'); q('DELETE FROM payments WHERE id=?', [$id]); flash('Payment deleted'); redirect('?p=fees');
         case 'expense_add':
@@ -124,7 +151,7 @@ if ($isPost) {
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'profile_save':
             q('UPDATE users SET name=?,phone=? WHERE id=?', [post('name'), post('phone'), $me['id']]);
@@ -137,6 +164,16 @@ if ($isPost) {
     redirect('./');
 }
 
+if ($p === 'proof_file') {
+    require_login();
+    $r = one('SELECT * FROM payment_requests WHERE id=?', [$id]);
+    if (!$r || !$r['proof'] || (!role('admin') && (int)$r['user_id'] !== (int)user()['id'])) { http_response_code(404); exit; }
+    $path = UPLOAD_DIR . '/' . basename($r['proof']);
+    if (!is_file($path)) { http_response_code(404); exit; }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path));
+    header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff');
+    readfile($path); exit;
+}
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
 if (!in_array($p, ['login', 'register'], true)) require_login();
 

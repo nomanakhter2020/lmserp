@@ -5,8 +5,10 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.1.0';
+const DB_VERSION = 2;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
+define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
 function cfg(): ?array {
     static $c = null;
@@ -72,3 +74,26 @@ function course_progress(int $uid, int $cid): int {
 }
 
 function can_manage_course(array $c): bool { return role('admin') || (role('teacher') && (int)$c['teacher_id'] === (int)user()['id']); }
+
+// Runs schema.sql (all CREATE IF NOT EXISTS) once per DB_VERSION bump
+function migrate() {
+    try { $v = (int)setting('db_version', '1'); } catch (Throwable $e) { $v = 1; }
+    if ($v >= DB_VERSION) return;
+    foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__ . '/schema.sql')))) as $sql) db()->exec($sql);
+    q('REPLACE INTO settings(k,v) VALUES("db_version",?)', [DB_VERSION]);
+}
+
+// Saves an uploaded image/PDF proof; returns stored filename or '' / throws on bad file
+function save_upload(string $field): string {
+    if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return '';
+    $f = $_FILES[$field];
+    if ($f['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Upload failed, try a smaller file.');
+    if ($f['size'] > 5 * 1024 * 1024) throw new RuntimeException('File too large (max 5 MB).');
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'][$mime] ?? null;
+    if (!$ext) throw new RuntimeException('Only JPG, PNG, WEBP or PDF allowed.');
+    if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0750, true);
+    $name = date('Ymd') . '-' . bin2hex(random_bytes(8)) . '.' . $ext;
+    if (!move_uploaded_file($f['tmp_name'], UPLOAD_DIR . '/' . $name)) throw new RuntimeException('Could not save file.');
+    return $name;
+}

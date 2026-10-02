@@ -6,6 +6,11 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
 <form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="settings_save">
   <label>Institute name<input name="institute" value="<?= e(setting('institute')) ?>" required></label>
   <label>Contact phone<input name="phone" value="<?= e(setting('phone')) ?>"></label>
+  <h3>Payment details shown to students</h3>
+  <label>Bank account<textarea name="pay_bank" rows="2" placeholder="Meezan Bank · Title · IBAN"><?= e(setting('pay_bank')) ?></textarea></label>
+  <label>JazzCash<input name="pay_jazzcash" value="<?= e(setting('pay_jazzcash')) ?>" placeholder="0300-1234567 · Account title"></label>
+  <label>EasyPaisa<input name="pay_easypaisa" value="<?= e(setting('pay_easypaisa')) ?>" placeholder="0345-1234567 · Account title"></label>
+  <label>Cash instructions<input name="pay_cash" value="<?= e(setting('pay_cash')) ?>" placeholder="Pay at office, Mon–Sat 10am–6pm"></label>
   <input type="hidden" name="allow_register" value="0"><label class="check"><input type="checkbox" name="allow_register" value="1" <?= setting('allow_register', '1') === '1' ? 'checked' : '' ?>> Students can sign up themselves</label>
   <input type="hidden" name="paid_needs_approval" value="0"><label class="check"><input type="checkbox" name="paid_needs_approval" value="1" <?= setting('paid_needs_approval', '1') === '1' ? 'checked' : '' ?>> Paid courses need fee approval before access</label>
   <button class="btn block">Save settings</button></form>

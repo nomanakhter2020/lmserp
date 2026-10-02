@@ -116,3 +116,19 @@ CREATE TABLE IF NOT EXISTS settings (
   k VARCHAR(60) PRIMARY KEY,
   v TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS payment_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  course_id INT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  method VARCHAR(40) NOT NULL,
+  txn_ref VARCHAR(100) DEFAULT '',
+  proof VARCHAR(120) DEFAULT '',
+  note VARCHAR(255) DEFAULT '',
+  status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  admin_note VARCHAR(255) DEFAULT '',
+  payment_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(status), INDEX(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

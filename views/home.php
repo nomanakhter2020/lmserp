@@ -26,6 +26,7 @@ if (role('admin')):
 <div class="quick">
   <a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
 </div>
+<?php if ($np = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')): ?><a class="alert warn" href="?p=proofs" style="display:block">🧾 <?= $np ?> payment proof<?= $np > 1 ? 's' : '' ?> waiting for verification ›</a><?php endif ?>
 <?php if ($pending): ?>
 <h2>Pending enrollments</h2>
 <div class="list"><?php foreach ($pending as $r): ?>
