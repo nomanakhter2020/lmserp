@@ -74,7 +74,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
     <div class="cgrid">
     <?php foreach ($courses as $c): ?>
       <article class="course" style="--c:<?= e($c['color']) ?>">
-        <div class="c-top"><span><?= e($c['cname'] ?: 'General') ?></span></div>
+        <div class="c-top<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"><span><?= e($c['cname'] ?: 'General') ?></span></div>
         <div class="c-body">
           <h3><?= e($c['title']) ?></h3>
           <p><?= e(mb_strimwidth((string)$c['description'], 0, 120, '…')) ?></p>

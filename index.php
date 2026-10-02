@@ -30,10 +30,16 @@ if ($isPost) {
             require_role('admin', 'teacher');
             $teacher = role('admin') ? ((int)post('teacher_id') ?: null) : $me['id'];
             $data = [post('title'), post('description'), (int)post('category_id') ?: null, $teacher, (float)post('fee'), post('color', '#4f46e5'), post('published') ? 1 : 0];
+            try { $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=course_edit' . ($id ? "&id=$id" : '')); }
             if ($id) {
                 $c = one('SELECT * FROM courses WHERE id=?', [$id]); if (!$c || !can_manage_course($c)) exit('Not allowed');
                 q('UPDATE courses SET title=?,description=?,category_id=?,teacher_id=?,fee=?,color=?,published=? WHERE id=?', [...$data, $id]);
             } else { q('INSERT INTO courses(title,description,category_id,teacher_id,fee,color,published) VALUES(?,?,?,?,?,?,?)', $data); $id = db()->lastInsertId(); }
+            if ($cover || post('remove_cover')) {
+                $old = val('SELECT cover FROM courses WHERE id=?', [$id]);
+                if ($old) @unlink(UPLOAD_DIR . '/covers/' . basename($old));
+                q('UPDATE courses SET cover=? WHERE id=?', [$cover, $id]);
+            }
             flash('Course saved'); redirect("?p=course&id=$id");
         case 'course_delete':
             require_role('admin');
@@ -164,6 +170,14 @@ if ($isPost) {
     redirect('./');
 }
 
+if ($p === 'cover') { // public: course covers are shown on the website
+    $f = basename((string)get('f'));
+    $path = UPLOAD_DIR . '/covers/' . $f;
+    if (!preg_match('/^c[\w-]+\.(jpg|png|webp)$/', $f) || !is_file($path)) { http_response_code(404); exit; }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path));
+    header('Cache-Control: public, max-age=2592000, immutable');
+    readfile($path); exit;
+}
 if ($p === 'proof_file') {
     require_login();
     $r = one('SELECT * FROM payment_requests WHERE id=?', [$id]);

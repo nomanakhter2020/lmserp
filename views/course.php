@@ -17,6 +17,7 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
   <?php if ($en && $access): ?><div class="bar light"><i style="width:<?= $pc ?>%"></i></div><div class="muted-l"><?= $pc ?>% complete</div><?php endif ?>
   <div class="split"><div><b><?= count($lessons) ?></b><span>Lessons</span></div><div><b><?= count($quizzes) ?></b><span>Quizzes</span></div><div><b><?= (float)$c['fee'] > 0 ? money($c['fee']) : 'Free' ?></b><span>Fee</span></div></div>
 </div>
+<?php if ($c['cover']): ?><img class="cover-img" src="<?= e(cover_url($c)) ?>" alt=""><?php endif ?>
 <?php if ($c['description']): ?><p class="desc"><?= nl2br(e($c['description'])) ?></p><?php endif ?>
 
 <?php if (role('student')): ?>

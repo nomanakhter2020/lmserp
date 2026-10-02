@@ -116,3 +116,4 @@ details p{color:var(--mu);margin:12px 0 0}
   .cta-box{padding:32px 24px;text-align:center;justify-content:center}.cta-btns{justify-content:center;width:100%}
   .foot-in{flex-direction:column;text-align:center}.foot nav{justify-content:center}
 }
+.c-top.img{height:180px;background-size:cover;background-position:center}.c-top.img::after{display:none}

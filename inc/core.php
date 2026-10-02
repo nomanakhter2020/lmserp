@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.2.1';
-const DB_VERSION = 2;
+const APP_VERSION = '1.3.0';
+const DB_VERSION = 3;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -80,6 +80,8 @@ function migrate() {
     try { $v = (int)setting('db_version', '1'); } catch (Throwable $e) { $v = 1; }
     if ($v >= DB_VERSION) return;
     foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__ . '/schema.sql')))) as $sql) db()->exec($sql);
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='courses' AND COLUMN_NAME='cover'"))
+        db()->exec("ALTER TABLE courses ADD cover VARCHAR(120) DEFAULT ''");
     q('REPLACE INTO settings(k,v) VALUES("db_version",?)', [DB_VERSION]);
 }
 
@@ -97,3 +99,26 @@ function save_upload(string $field): string {
     if (!move_uploaded_file($f['tmp_name'], UPLOAD_DIR . '/' . $name)) throw new RuntimeException('Could not save file.');
     return $name;
 }
+
+// Saves an uploaded cover image, shrunk to max 1280px wide JPEG when GD is available
+function save_cover(string $field): string {
+    if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return '';
+    $f = $_FILES[$field];
+    if ($f['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Upload failed, try a smaller image.');
+    if ($f['size'] > 8 * 1024 * 1024) throw new RuntimeException('Image too large (max 8 MB).');
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) throw new RuntimeException('Cover must be JPG, PNG or WEBP.');
+    if (!is_dir(UPLOAD_DIR . '/covers')) mkdir(UPLOAD_DIR . '/covers', 0750, true);
+    $name = 'c' . date('Ymd') . '-' . bin2hex(random_bytes(6));
+    if (function_exists('imagecreatefromstring') && ($im = @imagecreatefromstring(file_get_contents($f['tmp_name'])))) {
+        $w = imagesx($im); $h = imagesy($im);
+        if ($w > 1280) { $nh = (int)round($h * 1280 / $w); $r = imagecreatetruecolor(1280, $nh); imagecopyresampled($r, $im, 0, 0, 0, 0, 1280, $nh, $w, $h); $im = $r; }
+        imagejpeg($im, UPLOAD_DIR . "/covers/$name.jpg", 82);
+        return "$name.jpg";
+    }
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+    if (!move_uploaded_file($f['tmp_name'], UPLOAD_DIR . "/covers/$name.$ext")) throw new RuntimeException('Could not save image.');
+    return "$name.$ext";
+}
+function cover_url(array $c): string { return !empty($c['cover']) ? '?p=cover&f=' . rawurlencode($c['cover']) : ''; }
+function cover_style(array $c): string { $u = cover_url($c); return $u ? "background-image:url('" . e($u) . "')" : ''; }

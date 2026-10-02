@@ -1,13 +1,17 @@
 <?php
 require_role('admin', 'teacher');
-$c = $id ? one('SELECT * FROM courses WHERE id=?', [$id]) : ['title' => '', 'description' => '', 'category_id' => null, 'teacher_id' => user()['id'], 'fee' => 0, 'color' => '#4f46e5', 'published' => 1];
+$c = $id ? one('SELECT * FROM courses WHERE id=?', [$id]) : ['title' => '', 'description' => '', 'category_id' => null, 'teacher_id' => user()['id'], 'fee' => 0, 'color' => '#4f46e5', 'published' => 1, 'cover' => ''];
 if ($id && (!$c || !can_manage_course($c))) exit('Not allowed');
 $title = $id ? 'Edit course' : 'New course'; $back = $id ? "?p=course&id=$id" : '?p=courses';
 $cats = all('SELECT * FROM categories ORDER BY name');
 $teachers = all('SELECT id,name FROM users WHERE role IN ("teacher","admin") AND active=1 ORDER BY name');
 ?>
-<form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="course_save"><input type="hidden" name="id" value="<?= $id ?>">
+<form method="post" class="card" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="a" value="course_save"><input type="hidden" name="id" value="<?= $id ?>">
   <label>Title<input name="title" value="<?= e($c['title']) ?>" required></label>
+  <label>Cover photo <small>(landscape, e.g. 1280×720)</small>
+    <div class="cover-pick" id="cprev" style="<?= cover_style($c) ?>"><span><?= !empty($c['cover']) ? 'Tap to change' : '📷 Tap to add cover photo' ?></span>
+    <input type="file" name="cover" accept="image/*" onchange="const f=this.files[0];if(f){const p=document.getElementById('cprev');p.style.backgroundImage='url('+URL.createObjectURL(f)+')';p.querySelector('span').textContent='Tap to change'}"></div></label>
+  <?php if (!empty($c['cover'])): ?><label class="check"><input type="checkbox" name="remove_cover" value="1"> Remove cover photo</label><?php endif ?>
   <label>Description<textarea name="description" rows="4"><?= e($c['description']) ?></textarea></label>
   <div class="two">
     <label>Category<select name="category_id"><option value="">General</option><?php foreach ($cats as $x): ?><option value="<?= $x['id'] ?>" <?= $c['category_id'] == $x['id'] ? 'selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach ?></select></label>

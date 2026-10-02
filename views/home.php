@@ -46,7 +46,7 @@ if (role('admin')):
 <div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=announcements">📣 Announce</a></div>
 <h2>My courses</h2>
 <div class="grid"><?php foreach ($cs as $c): ?>
-  <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>"><div class="band"></div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= $c['st'] ?> students</small></a>
+  <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>"><div class="band<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"></div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= $c['st'] ?> students</small></a>
 <?php endforeach; if (!$cs): ?><p class="empty">No courses yet. Create your first one.</p><?php endif ?></div>
 
 <?php else:
