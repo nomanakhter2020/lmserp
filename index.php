@@ -154,8 +154,9 @@ if ($isPost) {
         case 'demo_seed':
             require_role('admin');
             require __DIR__ . '/inc/demo.php';
-            flash('Demo teachers ready: ' . implode(', ', demo_seed()));
-            redirect('?p=users&role=teacher');
+            $t = demo_seed(); $it = demo_it_seed();
+            flash('Demo ready — teachers: ' . implode(', ', $t) . ' · IT courses: ' . implode(', ', $it));
+            redirect('?p=courses');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':

@@ -104,3 +104,100 @@ function demo_seed(): array {
     }
     return $log;
 }
+
+function demo_fetch_cover(string $url): string {
+    $data = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 25, CURLOPT_USERAGENT => 'Mozilla/5.0']);
+        $data = curl_exec($ch);
+        if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $data = false;
+        curl_close($ch);
+    } else $data = @file_get_contents($url);
+    if (!$data || !function_exists('imagecreatefromstring') || !($im = @imagecreatefromstring($data))) return '';
+    $w = imagesx($im); $h = imagesy($im);
+    if ($w > 1280) { $nh = (int)round($h * 1280 / $w); $r = imagecreatetruecolor(1280, $nh); imagecopyresampled($r, $im, 0, 0, 0, 0, 1280, $nh, $w, $h); $im = $r; }
+    if (!is_dir(UPLOAD_DIR . '/covers')) mkdir(UPLOAD_DIR . '/covers', 0750, true);
+    $name = 'cdemo-' . bin2hex(random_bytes(5)) . '.jpg';
+    imagejpeg($im, UPLOAD_DIR . "/covers/$name", 84);
+    return $name;
+}
+
+// IT department demo: courses by Usman Tariq with lectures, videos, quizzes and cover images
+function demo_it_seed(): array {
+    $uid = (int)val('SELECT id FROM users WHERE email="usman.tariq@demo.lms"');
+    if (!$uid) return ['IT teacher missing'];
+    $cid = (int)(val('SELECT id FROM categories WHERE name="Programming"') ?: 0);
+    if (!$cid) { q('INSERT INTO categories(name) VALUES("Programming")'); $cid = (int)db()->lastInsertId(); }
+    $itc = (int)(val('SELECT id FROM categories WHERE name="IT Skills"') ?: 0);
+    if (!$itc) { q('INSERT INTO categories(name) VALUES("IT Skills")'); $itc = (int)db()->lastInsertId(); }
+    $C = 'https://pikaso.cdnpk.net/private/production/';
+    $courses = [
+      ['Web Development from Zero', $cid, 10000, '#059669', $C . '5618662330/render.png?token=exp=1791331200~hmac=3257a613194de5d5501850b586297aa3ab308605a28e37b663372a1159cad9a2',
+        'Learn HTML, CSS and JavaScript step by step and build three real websites, then publish them online.',
+        [
+          ['HTML & CSS full course (video)', 'https://www.youtube.com/watch?v=mU6anWqZJcc', "Watch this complete HTML & CSS lecture. Pause and type every example yourself in VS Code.\n\nWhat you will learn:\n• Page structure: <html>, <head>, <body>\n• Text, links, images and lists\n• CSS selectors, colours, box model and Flexbox\n\nHomework: build a one-page profile about yourself with a photo, short bio and contact links."],
+          ['JavaScript basics (video)', 'https://www.youtube.com/watch?v=PkZNo7MFNFg', "JavaScript makes websites interactive.\n\nKey topics:\n• Variables (let, const) and data types\n• If/else conditions and loops\n• Functions and events (click, input)\n• Changing the page with document.querySelector()\n\nHomework: add a dark-mode toggle button to your profile page."],
+          ['Project: landing page', '', "Build a landing page for a local business (bakery, salon, tuition centre).\n\nRequired sections:\n1. Header with logo and menu\n2. Hero with headline and button\n3. Services (3 cards)\n4. Testimonials\n5. Contact form and footer\n\nMake it mobile-friendly using Flexbox and media queries."],
+          ['Publishing your website', '', "Put your site online for free:\n\n1. Create a GitHub account and a new repository\n2. Upload your index.html, style.css and images\n3. Settings → Pages → choose main branch\n4. Your site goes live at username.github.io/repo\n\nShare the link in the class group for feedback."],
+        ],
+        ['Web Basics', [['HTML stands for:', 'HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Making Language', 'a'], ['Which language styles a web page?', 'HTML', 'PHP', 'CSS', 'SQL', 'c'], ['Which tag makes a link?', '<p>', '<a>', '<img>', '<div>', 'b'], ['Which keyword declares a constant in JavaScript?', 'var', 'let', 'const', 'fixed', 'c']]]],
+      ['Python Programming for Beginners', $cid, 9000, '#2563eb', $C . '5618661596/render.png?token=exp=1791331200~hmac=90a1875c46067eafceb1b164ae3b2e50f018ef8c47db20ae3a9dff296963b8e9',
+        'Start coding with Python — the most popular beginner language. Variables, loops, functions and small real projects. No experience needed.',
+        [
+          ['Python full course for beginners (video)', 'https://www.youtube.com/watch?v=rfscVS0vtbw', "This lecture covers Python from zero. Install Python from python.org and VS Code before starting.\n\nFocus on the first hour this week:\n• print() and comments\n• Variables and data types\n• Strings and numbers\n• Getting input from the user"],
+          ['Conditions & loops', '', "Making decisions and repeating work:\n\nif marks >= 50:\n    print('Pass')\nelse:\n    print('Fail')\n\nfor i in range(1, 11):\n    print(i)\n\nPractice: print the multiplication table of any number the user enters."],
+          ['Lists & functions', '', "Lists store many values: fruits = ['apple', 'mango']\n\nFunctions reuse code:\n\ndef area(l, w):\n    return l * w\n\nPractice: write a function that returns the average of a list of marks."],
+          ['Mini project: student result calculator', '', "Build a program that:\n1. Asks for a student's name and 5 subject marks\n2. Calculates total, percentage and grade (A/B/C/F)\n3. Prints a neat result card\n\nBonus: save results to a text file."],
+        ],
+        ['Python Basics', [['Which function prints output in Python?', 'echo()', 'print()', 'write()', 'say()', 'b'], ['What is the result of 10 // 3?', '3.33', '3', '1', '30', 'b'], ['Which symbol starts a comment?', '//', '#', '<!--', '--', 'b'], ['Which keyword defines a function?', 'func', 'function', 'def', 'fn', 'c']]]],
+      ['Computer Basics & MS Office', $itc, 4000, '#ea580c', $C . '5618662540/render.png?token=exp=1791331200~hmac=4510980c88e8424bbaee7400a6e7cbb86f485485ca2c7db81f9f972d938072da',
+        'Essential computer skills for students and office jobs: Windows, typing, internet, email, Word, Excel and PowerPoint.',
+        [
+          ['Getting to know your computer', '', "Parts of a computer: CPU, RAM, storage, monitor, keyboard, mouse.\n\nWindows basics:\n• Desktop, Start menu and taskbar\n• Creating, renaming and moving folders\n• Copy (Ctrl+C), Paste (Ctrl+V), Undo (Ctrl+Z)\n\nPractice: create a folder for each subject and organise your files."],
+          ['MS Word: professional documents', '', "Learn to make a CV and an application letter:\n• Fonts, headings and paragraph spacing\n• Bullets and numbering\n• Inserting tables and pictures\n• Page margins and printing / Save as PDF"],
+          ['MS Excel: marks sheet & formulas', '', "Create a class marks sheet:\n• =SUM(B2:F2) for total\n• =AVERAGE(B2:F2) for average\n• =IF(G2>=50,\"Pass\",\"Fail\") for result\n• Sorting, filters and a simple chart"],
+          ['PowerPoint: presenting with confidence', '', "Design a 5-slide presentation:\n• Choose a clean theme\n• One idea per slide, big text, few words\n• Add images and icons\n• Use simple transitions — avoid heavy animations"],
+        ],
+        ['Computer Basics', [['Shortcut to copy:', 'Ctrl+V', 'Ctrl+C', 'Ctrl+X', 'Ctrl+Z', 'b'], ['Which program is best for calculations?', 'Word', 'PowerPoint', 'Excel', 'Paint', 'c'], ['RAM is:', 'Permanent storage', 'Temporary working memory', 'A printer', 'An input device', 'b']]]],
+      ['Graphic Design with Canva & Photoshop', $itc, 7000, '#c026d3', $C . '5618662376/render.png?token=exp=1791331200~hmac=edbe9781b30fd2e4ba2831fd33616968a74575729a2f39da1d4aa00807589f90',
+        'Design social media posts, logos, flyers and thumbnails. Learn design principles first, then practical tools.',
+        [
+          ['Design principles that matter', '', "Good design follows simple rules:\n• Contrast — make important things stand out\n• Alignment — line things up\n• Repetition — consistent colours and fonts\n• White space — don't crowd the design\n\nAssignment: find 3 ads you like and note which principles they use."],
+          ['Colours & typography', '', "• Use 2–3 colours maximum; pick from a palette (coolors.co)\n• Pair one heading font with one body font\n• Keep text readable: dark on light or light on dark\n\nPractice: make an Instagram quote post in Canva."],
+          ['Logo & brand kit', '', "Create a simple logo for a fictional brand:\n1. Brainstorm keywords for the brand\n2. Sketch 5 ideas on paper\n3. Build the best one in Canva or Photoshop\n4. Export PNG with transparent background"],
+          ['Photoshop essentials', '', "Key tools: layers, selection, crop, healing brush, text and adjustment layers.\n\nProject: remove the background from a product photo and place it on a clean social media banner."],
+        ],
+        ['Design Basics', [['Using too many fonts makes a design:', 'Professional', 'Cluttered', 'Brighter', 'Smaller', 'b'], ['Which file type supports transparent background?', 'JPG', 'PNG', 'BMP', 'DOCX', 'b'], ['Empty space in a design is called:', 'Gap fill', 'White space', 'Margin error', 'Blank layer', 'b']]]],
+      ['Digital Marketing & Freelancing', $itc, 8000, '#0891b2', $C . '5618663537/render.png?token=exp=1791331200~hmac=79a8b425a52da825307646591b0e55246ab92a9e89c3fc9284187ac57134e097',
+        'Grow businesses online with social media, ads and SEO — then learn to sell your skills on Upwork and Fiverr.',
+        [
+          ['How digital marketing works', '', "The customer journey: Awareness → Interest → Decision → Action.\n\nChannels: social media, search (SEO), paid ads, email and WhatsApp marketing.\n\nAssignment: pick a local business and list where its customers spend time online."],
+          ['Facebook & Instagram marketing', '', "• Set up a business page with a clear profile photo and bio\n• Post consistently: 3–5 times a week\n• Mix content: educational, behind-the-scenes, offers\n• Basics of boosting a post and targeting by city, age and interests"],
+          ['SEO basics', '', "Help Google find a website:\n• Choose keywords people actually search\n• Use the keyword in the page title, heading and first paragraph\n• Make the site fast and mobile-friendly\n• Get a Google Business Profile for local customers"],
+          ['Start freelancing', '', "1. Pick one skill to sell (design, web, social media)\n2. Build a portfolio with 3 sample projects\n3. Create a Fiverr gig / Upwork profile with a clear title\n4. Send short, personalised proposals\n5. Deliver on time and ask for a review\n\nGet paid in Pakistan via Payoneer or bank transfer."],
+        ],
+        ['Marketing Basics', [['SEO stands for:', 'Search Engine Optimization', 'Social Engagement Online', 'Sales Email Order', 'Site Edit Option', 'a'], ['First stage of the customer journey:', 'Action', 'Decision', 'Awareness', 'Payment', 'c'], ['A freelancing portfolio shows:', 'Your bank balance', 'Samples of your work', 'Your exam marks', 'Your followers', 'b']]]],
+    ];
+    $log = [];
+    foreach ($courses as [$title, $cat, $fee, $color, $img, $desc, $lessons, $quiz]) {
+        $id = (int)val('SELECT id FROM courses WHERE teacher_id=? AND title=?', [$uid, $title]);
+        if (!$id) {
+            q('INSERT INTO courses(title,description,category_id,teacher_id,fee,color,published) VALUES(?,?,?,?,?,?,1)', [$title, $desc, $cat, $uid, $fee, $color]);
+            $id = (int)db()->lastInsertId();
+        } else {
+            q('UPDATE courses SET description=?,category_id=? WHERE id=?', [$desc, $cat, $id]);
+        }
+        if (!val('SELECT cover FROM courses WHERE id=?', [$id]) && ($cv = demo_fetch_cover($img))) q('UPDATE courses SET cover=? WHERE id=?', [$cv, $id]);
+        foreach ($lessons as $i => [$lt, $vid, $txt]) {
+            if (!val('SELECT id FROM lessons WHERE course_id=? AND title=?', [$id, $lt])) q('INSERT INTO lessons(course_id,title,video_url,content,sort) VALUES(?,?,?,?,?)', [$id, $lt, $vid, $txt, 10 + $i]);
+        }
+        if (!val('SELECT id FROM quizzes WHERE course_id=? AND title=?', [$id, $quiz[0]])) {
+            q('INSERT INTO quizzes(course_id,title,pass_percent) VALUES(?,?,60)', [$id, $quiz[0]]);
+            $qid = (int)db()->lastInsertId();
+            foreach ($quiz[1] as $qq) q('INSERT INTO questions(quiz_id,question,a,b,c,d,answer) VALUES(?,?,?,?,?,?,?)', [$qid, ...$qq]);
+        }
+        $log[] = $title . (val('SELECT cover FROM courses WHERE id=?', [$id]) ? '' : ' (no cover)');
+    }
+    return $log;
+}
