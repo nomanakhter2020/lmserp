@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.3.0';
-const DB_VERSION = 3;
+const APP_VERSION = '1.4.0';
+const DB_VERSION = 4;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -122,3 +122,13 @@ function save_cover(string $field): string {
 }
 function cover_url(array $c): string { return !empty($c['cover']) ? '?p=cover&f=' . rawurlencode($c['cover']) : ''; }
 function cover_style(array $c): string { $u = cover_url($c); return $u ? "background-image:url('" . e($u) . "')" : ''; }
+
+function teacher_profile(int $uid): array {
+    $p = one('SELECT * FROM teacher_profiles WHERE user_id=?', [$uid]) ?: [];
+    $p += ['photo' => '', 'headline' => '', 'bio' => '', 'city' => '', 'years' => 0, 'skills' => '', 'languages' => '', 'achievements' => '', 'linkedin' => '', 'website' => '', 'youtube' => '', 'public' => 1];
+    foreach (['education', 'experience', 'certifications'] as $k) $p[$k] = json_decode((string)($p[$k] ?? ''), true) ?: [];
+    return $p;
+}
+function photo_url(string $f): string { return $f ? '?p=cover&f=' . rawurlencode($f) : ''; }
+function csv_list(?string $s): array { return array_values(array_filter(array_map('trim', explode(',', (string)$s)))); }
+function safe_url(string $u): string { return preg_match('~^https?://~i', $u) ? $u : ($u ? 'https://' . ltrim($u, '/') : ''); }

@@ -13,6 +13,7 @@ $stats = [
   [(int)val('SELECT COUNT(*) FROM users WHERE role="teacher"') ?: 1, 'Teachers'],
 ];
 $me = user();
+$teachers = all('SELECT u.id,u.name,tp.photo,tp.headline,tp.years,(SELECT COUNT(*) FROM courses c WHERE c.teacher_id=u.id AND c.published=1) cc FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.active=1 AND u.role IN ("teacher","admin") AND tp.public=1 ORDER BY cc DESC, u.id LIMIT 8');
 $canReg = setting('allow_register', '1') === '1';
 $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 ?><!doctype html>
@@ -24,14 +25,14 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 <meta name="theme-color" content="#4f46e5"><link rel="manifest" href="manifest.json"><link rel="icon" href="assets/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=<?= APP_VERSION ?>">
+<link rel="stylesheet" href="assets/site.css?v=<?= APP_VERSION ?>"><link rel="stylesheet" href="assets/cv.css?v=<?= APP_VERSION ?>">
 </head><body>
 
 <header class="nav" id="top">
   <div class="container nav-in">
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
-      <a href="#courses">Courses</a><a href="#why">Why us</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#contact">Contact</a>
+      <a href="#courses">Courses</a><?php if ($teachers): ?><a href="#teachers">Teachers</a><?php endif ?><a href="#why">Why us</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#contact">Contact</a>
       <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a>
       <?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>"><?= $canReg ? 'Enroll now' : 'Log in' ?></a><?php endif ?>
     </nav>
@@ -88,7 +89,26 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   </div>
 </section>
 
-<section id="why" class="sec alt">
+<?php if ($teachers): ?>
+<section id="teachers" class="sec alt">
+  <div class="container">
+    <div class="sec-head"><span class="kicker">Our teachers</span><h2>Learn from experienced teachers</h2><p>Tap a teacher to see their full profile, qualifications and experience.</p></div>
+    <div class="tgrid">
+    <?php foreach ($teachers as $t): ?>
+      <a class="tcard" href="?p=teacher&id=<?= $t['id'] ?>">
+        <div class="tp"><?php if ($t['photo']): ?><img src="<?= e(photo_url($t['photo'])) ?>" alt="<?= e($t['name']) ?>" loading="lazy"><?php else: ?><?= e(mb_strtoupper(mb_substr($t['name'], 0, 1))) ?><?php endif ?></div>
+        <h3><?= e($t['name']) ?></h3>
+        <?php if ($t['headline']): ?><div class="th"><?= e($t['headline']) ?></div><?php endif ?>
+        <div class="tm"><?= $t['years'] ? (int)$t['years'] . '+ yrs experience · ' : '' ?><?= $t['cc'] ?> course<?= $t['cc'] == 1 ? '' : 's' ?></div>
+        <span class="btn-o sm">View profile →</span>
+      </a>
+    <?php endforeach ?>
+    </div>
+  </div>
+</section>
+<?php endif ?>
+
+<section id="why" class="sec">
   <div class="container">
     <div class="sec-head"><span class="kicker">Why choose us</span><h2>Learning that fits your life</h2></div>
     <div class="fgrid">
@@ -102,7 +122,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   </div>
 </section>
 
-<section id="how" class="sec">
+<section id="how" class="sec alt">
   <div class="container">
     <div class="sec-head"><span class="kicker">How it works</span><h2>Start in 3 simple steps</h2></div>
     <div class="steps">
@@ -114,7 +134,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   </div>
 </section>
 
-<section id="faq" class="sec alt">
+<section id="faq" class="sec">
   <div class="container narrow">
     <div class="sec-head"><span class="kicker">FAQ</span><h2>Frequently asked questions</h2></div>
     <details><summary>Do I need a laptop?</summary><p>No. Everything works on your mobile phone. You can even install it like an app from your browser.</p></details>
@@ -153,7 +173,7 @@ document.querySelectorAll('#menu a').forEach(a=>a.addEventListener('click',()=>d
 addEventListener('scroll',()=>document.querySelector('.nav').classList.toggle('scrolled',scrollY>10),{passive:true});
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);
   const n=e.target.querySelector('[data-count]');}}),{threshold:.15});
-document.querySelectorAll('.sec-head,.course,.feat,.step,details,.cta-box,.stats>div').forEach(el=>{el.classList.add('rv');io.observe(el)});
+document.querySelectorAll('.sec-head,.course,.tcard,.feat,.step,details,.cta-box,.stats>div').forEach(el=>{el.classList.add('rv');io.observe(el)});
 document.querySelectorAll('[data-count]').forEach(el=>{const t=+el.dataset.count;if(t<2)return;let s=null;el.textContent='0';
   new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect();const step=ts=>{s??=ts;const p=Math.min((ts-s)/1200,1);el.textContent=Math.round(t*p*(2-p))+(p===1?'+':'');if(p<1)requestAnimationFrame(step)};requestAnimationFrame(step)}).observe(el)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');

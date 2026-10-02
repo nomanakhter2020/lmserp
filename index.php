@@ -159,6 +159,28 @@ if ($isPost) {
             require_role('admin');
             foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
+        case 'tprofile_save':
+            $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
+            if (!role('admin') && !role('teacher')) exit('Not allowed');
+            $rows = function (string $k, array $fields) {
+                $out = [];
+                foreach ((array)($_POST[$k] ?? []) as $r) {
+                    $r = array_map(fn($f) => trim((string)($r[$f] ?? '')), array_combine($fields, $fields));
+                    if (implode('', $r) !== '') $out[] = $r;
+                }
+                return json_encode($out, JSON_UNESCAPED_UNICODE);
+            };
+            $old = teacher_profile($uid);
+            try { $photo = save_cover('photo'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=tprofile&id=$uid"); }
+            if ($photo && $old['photo']) @unlink(UPLOAD_DIR . '/covers/' . basename($old['photo']));
+            if (!$photo) $photo = post('remove_photo') ? '' : $old['photo'];
+            q('REPLACE INTO teacher_profiles(user_id,photo,headline,bio,city,years,skills,languages,education,experience,certifications,achievements,linkedin,website,youtube,public) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+                $uid, $photo, post('headline'), post('bio'), post('city'), (int)post('years'), post('skills'), post('languages'),
+                $rows('edu', ['degree', 'institute', 'year', 'detail']),
+                $rows('exp', ['role', 'org', 'period', 'detail']),
+                $rows('cert', ['name', 'issuer', 'year']),
+                post('achievements'), post('linkedin'), post('website'), post('youtube'), post('public') ? 1 : 0]);
+            flash('Profile saved'); redirect("?p=tprofile&id=$uid");
         case 'profile_save':
             q('UPDATE users SET name=?,phone=? WHERE id=?', [post('name'), post('phone'), $me['id']]);
             if ((string)($_POST['password'] ?? '') !== '') {
@@ -188,6 +210,7 @@ if ($p === 'proof_file') {
     header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff');
     readfile($path); exit;
 }
+if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 // Public website: guests landing on the root URL, or anyone via ?p=site
 if (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site') { require __DIR__ . '/views/landing.php'; exit; }
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }

@@ -19,6 +19,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <div class="quick">
   <?php if ($wa): ?><a href="https://wa.me/<?= $wa ?>" target="_blank" rel="noopener">💬 WhatsApp</a><a href="tel:<?= e($u['phone']) ?>">📞 Call</a><?php endif ?>
   <?php if (role('admin')): ?><a href="?p=user_edit&id=<?= $id ?>">✏️ Edit</a><?php endif ?>
+  <?php if (role('admin') && $u['role'] !== 'student'): ?><a href="?p=tprofile&id=<?= $id ?>">🪪 CV profile</a><a href="?p=teacher&id=<?= $id ?>" target="_blank">🌐 View CV</a><?php endif ?>
 </div>
 <?php if (role('admin') && $u['role'] === 'student'): ?>
 <div class="stats"><div class="stat"><b><?= money($paid) ?></b><span>Paid</span></div><div class="stat"><b class="<?= $due > 0 ? 'neg' : '' ?>"><?= money(max(0, $due)) ?></b><span>Balance due</span></div></div>

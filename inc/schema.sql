@@ -132,3 +132,24 @@ CREATE TABLE IF NOT EXISTS payment_requests (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX(status), INDEX(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+CREATE TABLE IF NOT EXISTS teacher_profiles (
+  user_id INT PRIMARY KEY,
+  photo VARCHAR(120) DEFAULT '',
+  headline VARCHAR(200) DEFAULT '',
+  bio TEXT,
+  city VARCHAR(100) DEFAULT '',
+  years INT DEFAULT 0,
+  skills TEXT,
+  languages VARCHAR(255) DEFAULT '',
+  education MEDIUMTEXT,
+  experience MEDIUMTEXT,
+  certifications MEDIUMTEXT,
+  achievements TEXT,
+  linkedin VARCHAR(255) DEFAULT '',
+  website VARCHAR(255) DEFAULT '',
+  youtube VARCHAR(255) DEFAULT '',
+  public TINYINT(1) NOT NULL DEFAULT 1,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

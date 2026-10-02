@@ -12,7 +12,7 @@ $ann = all('SELECT * FROM announcements WHERE course_id=? ORDER BY id DESC LIMIT
 $pc = $en ? course_progress((int)$me['id'], $id) : 0;
 ?>
 <div class="hero" style="--c:<?= e($c['color']) ?>">
-  <div class="muted-l"><?= e($c['cname'] ?: 'General') ?> · <?= e($c['tname'] ?: 'No teacher') ?></div>
+  <div class="muted-l"><?= e($c['cname'] ?: 'General') ?> · <?= $c['teacher_id'] ? '<a class="tlink" href="?p=teacher&id=' . (int)$c['teacher_id'] . '">' . e($c['tname']) . ' ›</a>' : 'No teacher' ?></div>
   <div class="big sm"><?= e($c['title']) ?></div>
   <?php if ($en && $access): ?><div class="bar light"><i style="width:<?= $pc ?>%"></i></div><div class="muted-l"><?= $pc ?>% complete</div><?php endif ?>
   <div class="split"><div><b><?= count($lessons) ?></b><span>Lessons</span></div><div><b><?= count($quizzes) ?></b><span>Quizzes</span></div><div><b><?= (float)$c['fee'] > 0 ? money($c['fee']) : 'Free' ?></b><span>Fee</span></div></div>
