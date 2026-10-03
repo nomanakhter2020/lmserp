@@ -22,6 +22,7 @@ $items = [
   ['payroll', '💰', role('admin') ? 'Teacher payroll' : 'My salary', role('admin', 'teacher')],
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
+  ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
   ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
   ['biometric', '👆', 'Fingerprint login', true],
   ['help', '❓', 'Help & guides', true],
@@ -30,7 +31,7 @@ $items = [
 ];
 ?>
 <div class="list menu">
-<?php foreach ($items as [$k, $i, $l, $show]): if (!$show) continue; ?>
+<?php foreach ($items as [$k, $i, $l, $show]): if (!$show || !view_on($k)) continue; ?>
   <a class="row" href="?p=<?= $k ?>"><span class="mi"><?= $i ?></span><b class="grow"><?= $l ?></b><span>›</span></a>
 <?php endforeach ?>
   <a class="row" href="?p=logout"><span class="mi">🚪</span><b class="grow neg">Log out</b></a>

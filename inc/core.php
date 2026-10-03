@@ -5,7 +5,7 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 const DB_VERSION = 16;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
@@ -457,6 +457,25 @@ function set_order_status(array $o, string $st, ?string $tracking, ?string $note
     if ($st !== $o['status'] && $o['user_id']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], $tracking ? 'Tracking: ' . $tracking : ($note ?: ''), "?p=order&id=$id", '📦');
 }
 // Teacher marketplace: teacher's % of each sale; earnings count once an order is delivered
+/* ---------------- Modules (turn parts of the app on/off per site) ---------------- */
+const MODULES = [
+    'lms' => ['📚', 'LMS — online courses', 'Courses, video lessons, quizzes, certificates, enrollments'],
+    'school' => ['🏫', 'School management', 'Batches, attendance, assignments, exams & result cards, fee vouchers, payroll'],
+    'shop' => ['🛒', 'E-commerce shop', 'Public store, guest checkout, orders, order tracking, teacher marketplace'],
+    'website' => ['🌐', 'Website & blog', 'Public website, blog, legal pages, contact form'],
+    'accounts' => ['💰', 'Accounts', 'Expenses, recurring expenses, income & expense reports'],
+];
+const MODULE_VIEWS = [
+    'lms' => ['courses', 'course', 'course_edit', 'lesson', 'quiz', 'certificates', 'cert', 'enrollments', 'my'],
+    'school' => ['batches', 'batch', 'batch_edit', 'attendance', 'att_report', 'attendance_me', 'assignments', 'assignment', 'assign_edit', 'exams', 'exam', 'exam_edit', 'result', 'payroll', 'slip', 'vouchers', 'voucher', 'voucher_gen'],
+    'shop' => ['shop', 'product', 'cart', 'orders', 'order', 'products', 'product_edit', 'earnings', 'store', 'store_product', 'store_cart', 'store_checkout', 'track'],
+    'website' => ['blog', 'post', 'page', 'posts', 'post_edit', 'pages_edit', 'messages', 'site'],
+    'accounts' => ['expenses', 'recurring', 'expense_cats', 'reports'],
+];
+function mod(string $m): bool { return setting('mod_' . $m, '1') === '1'; }
+function view_module(string $view): ?string { foreach (MODULE_VIEWS as $m => $vs) if (in_array($view, $vs, true)) return $m; return null; }
+function view_on(string $view): bool { $m = view_module($view); return $m === null || mod($m); }
+
 function teacher_pct(): float { return max(0, min(100, (float)setting('teacher_share', '50'))); }
 function teacher_balance(int $tid): array {
     $r = one('SELECT COALESCE(SUM(CASE WHEN o.status="delivered" THEN i.teacher_share END),0) earned, COALESCE(SUM(CASE WHEN o.status IN ("pending","paid","processing","shipped") THEN i.teacher_share END),0) pending, COALESCE(SUM(CASE WHEN o.status<>"cancelled" THEN i.qty END),0) sold FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.teacher_id=?', [$tid]);

@@ -7,6 +7,7 @@ migrate();
 $p = preg_replace('/[^a-z_]/', '', (string)get('p', 'home'));
 $id = (int)($_POST['id'] ?? get('id', 0));
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
+if (!view_on($p)) $p = user() ? 'home' : (mod('website') ? 'home' : 'login');
 if ($p === 'webauthn' && $isPost) { require __DIR__ . '/inc/webauthn.php'; }
 
 /* ------------------------- ACTIONS (POST) ------------------------- */
@@ -589,6 +590,10 @@ if ($isPost) {
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
+        case 'modules_save':
+            require_role('admin');
+            foreach (array_keys(MODULES) as $m) q('REPLACE INTO settings(k,v) VALUES(?,?)', ['mod_' . $m, post('mod_' . $m) ? '1' : '0']);
+            flash('Modules updated'); redirect('?p=modules');
         case 'settings_save':
             require_role('admin');
             foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title', 'shop_shipping', 'shop_free_over', 'shop_cod', 'teacher_share'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
@@ -680,7 +685,7 @@ if ($p === 'sitemap') {
     echo '</urlset>'; exit;
 }
 // Public website: guests landing on the root URL, or anyone via ?p=site
-if (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site') { require __DIR__ . '/views/landing.php'; exit; }
+if (mod('website') && (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site')) { require __DIR__ . '/views/landing.php'; exit; }
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
 if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register'], true)) require_login();
