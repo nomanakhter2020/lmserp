@@ -2,7 +2,8 @@
 $title = 'More';
 $items = [
   ['orders', '🛒', role('admin') ? 'Shop orders' . (($po = (int)val('SELECT COUNT(*) FROM orders WHERE status="pending"')) ? " ($po)" : '') : 'My orders', true],
-  ['products', '📚', 'Shop products', role('admin')],
+  ['products', '📚', role('admin') ? 'Shop products' . (($pp = (int)val('SELECT COUNT(*) FROM products WHERE review="pending"')) ? " ($pp pending)" : '') : 'My products', role('admin', 'teacher')],
+  ['earnings', '🤝', role('admin') ? 'Teacher sales & payouts' : 'My sales & earnings', role('admin', 'teacher')],
   ['batches', '🗓️', 'Batches & attendance', role('admin', 'teacher')],
   ['assignments', '📝', 'Assignments', true],
   ['exams', '🧾', role('admin', 'teacher') ? 'Exams & results' : 'Results', true],

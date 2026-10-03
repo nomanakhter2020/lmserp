@@ -64,6 +64,7 @@ $photo = photo_url($pr['photo']);
         <?php foreach ($pr['education'] as $x): ?><div class="tl-item"><div class="tl-top"><b><?= e($x['degree']) ?></b><span><?= e($x['year']) ?></span></div><div class="tl-org"><?= e($x['institute']) ?></div><?php if ($x['detail']): ?><p><?= e($x['detail']) ?></p><?php endif ?></div><?php endforeach ?>
       </div></section><?php endif ?>
       <?php if ($ach): ?><section class="cv-sec"><h2>Achievements</h2><ul class="ach"><?php foreach ($ach as $a): ?><li><?= e($a) ?></li><?php endforeach ?></ul></section><?php endif ?>
+      <?php $tprods = all('SELECT * FROM products WHERE teacher_id=? AND active=1 ORDER BY id DESC LIMIT 8', [$t['id']]); if ($tprods): ?><section class="cv-sec" id="products"><h2>Books &amp; material by <?= e(explode(' ', $t['name'])[0]) ?></h2><div class="sgrid tp"><?php foreach ($tprods as $p) require __DIR__ . '/_store_card.php'; ?></div></section><?php endif ?>
       <?php if ($courses): ?><section class="cv-sec" id="courses"><h2>Courses by <?= e(explode(' ', $t['name'])[0]) ?></h2><div class="cv-courses">
         <?php foreach ($courses as $c): ?><a class="cv-course" href="<?= $me ? "?p=course&id={$c['id']}" : $cta ?>" style="--c:<?= e($c['color']) ?>"><div class="cc-img" style="<?= cover_style($c) ?>"></div><div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= (float)$c['fee'] > 0 ? money($c['fee']) : 'Free' ?></small></div></a><?php endforeach ?>
       </div></section><?php endif ?>

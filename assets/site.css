@@ -202,3 +202,4 @@ details p{color:var(--mu);margin:12px 0 0}
 .cv-note.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
 @media(max-width:1000px){.sgrid{grid-template-columns:repeat(3,1fr)}.cgrid2{grid-template-columns:1fr}.csum{position:static}}
 @media(max-width:760px){.sgrid{grid-template-columns:repeat(2,1fr);gap:12px}.sbody{padding:10px}.sbody h3{font-size:14px}.pgrid{grid-template-columns:1fr;gap:20px}.pphoto{position:relative;top:0}.shop-hero{padding:90px 0 24px}.pg-h,.thanks{margin-top:80px}.cimg{width:64px;height:64px}.citem{align-items:flex-start}.shop-tools select{max-width:42%}}
+.sgrid.tp{grid-template-columns:repeat(3,1fr)}@media(max-width:760px){.sgrid.tp{grid-template-columns:repeat(2,1fr)}}

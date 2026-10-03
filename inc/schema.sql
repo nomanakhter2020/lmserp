@@ -435,4 +435,16 @@ CREATE TABLE IF NOT EXISTS order_items (
   qty INT NOT NULL DEFAULT 1,
   type VARCHAR(10) DEFAULT 'physical',
   INDEX(order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS teacher_payouts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  teacher_id INT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  method VARCHAR(40) DEFAULT 'Cash',
+  note VARCHAR(255) DEFAULT '',
+  paid_on DATE NOT NULL,
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(teacher_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

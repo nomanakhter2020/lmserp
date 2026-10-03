@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.4.0';
-const DB_VERSION = 14;
+const APP_VERSION = '2.5.0';
+const DB_VERSION = 15;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -103,6 +103,9 @@ function migrate() {
         db()->exec("ALTER TABLE orders MODIFY user_id INT NULL");
     if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payments' AND COLUMN_NAME='user_id'") === 'NO')
         db()->exec("ALTER TABLE payments MODIFY user_id INT NULL");
+    foreach ([['products', 'teacher_id', 'INT NULL'], ['products', 'review', "VARCHAR(10) DEFAULT ''"], ['order_items', 'teacher_id', 'INT NULL'], ['order_items', 'teacher_share', 'DECIMAL(10,2) DEFAULT 0']] as [$t, $col, $def])
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?", [$t, $col]))
+            db()->exec("ALTER TABLE $t ADD $col $def");
     foreach (['email' => "VARCHAR(160) DEFAULT ''", 'token' => "VARCHAR(32) DEFAULT ''"] as $col => $def)
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND COLUMN_NAME=?", [$col]))
             db()->exec("ALTER TABLE orders ADD $col $def");
@@ -421,7 +424,7 @@ function place_order(array $f): int|string {
     q('INSERT INTO orders(user_id,student_id,subtotal,shipping,total,name,phone,email,address,city,pay_method,proof,txn_ref,note,token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [$u['id'] ?? null, $sid, $sub, $ship, $sub + $ship, mb_substr(trim($f['name']), 0, 120), mb_substr(trim($f['phone']), 0, 40), mb_substr(trim($f['email'] ?? ''), 0, 160), mb_substr(trim($f['address'] ?? ''), 0, 300), mb_substr(trim($f['city'] ?? ''), 0, 80), $pm, $f['proof'] ?? '', mb_substr($f['txn_ref'] ?? '', 0, 100), mb_substr($f['note'] ?? '', 0, 300), $tok]);
     $oid = (int)db()->lastInsertId();
     foreach ($items as $it) {
-        q('INSERT INTO order_items(order_id,product_id,title,price,qty,type) VALUES(?,?,?,?,?,?)', [$oid, $it['id'], $it['title'], $it['price'], $it['qty'], $it['type']]);
+        $tid = $it['teacher_id'] ?? null; q('INSERT INTO order_items(order_id,product_id,title,price,qty,type,teacher_id,teacher_share) VALUES(?,?,?,?,?,?,?,?)', [$oid, $it['id'], $it['title'], $it['price'], $it['qty'], $it['type'], $tid, $tid ? round($it['price'] * $it['qty'] * teacher_pct() / 100, 2) : 0]);
         if ($it['stock'] !== null) q('UPDATE products SET stock=GREATEST(0,stock-?) WHERE id=?', [$it['qty'], $it['id']]);
     }
     unset($_SESSION['cart']);
@@ -439,6 +442,13 @@ function set_order_status(array $o, string $st, ?string $tracking, ?string $note
     if ($st === 'cancelled' && $o['status'] !== 'cancelled') foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
     q('UPDATE orders SET status=?,tracking=?,admin_note=? WHERE id=?', [$st, $tracking, $note, $id]);
     if ($st !== $o['status'] && $o['user_id']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], $tracking ? 'Tracking: ' . $tracking : ($note ?: ''), "?p=order&id=$id", '📦');
+}
+// Teacher marketplace: teacher's % of each sale; earnings count once an order is delivered
+function teacher_pct(): float { return max(0, min(100, (float)setting('teacher_share', '50'))); }
+function teacher_balance(int $tid): array {
+    $r = one('SELECT COALESCE(SUM(CASE WHEN o.status="delivered" THEN i.teacher_share END),0) earned, COALESCE(SUM(CASE WHEN o.status IN ("pending","paid","processing","shipped") THEN i.teacher_share END),0) pending, COALESCE(SUM(CASE WHEN o.status<>"cancelled" THEN i.qty END),0) sold FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.teacher_id=?', [$tid]);
+    $r['paid'] = (float)val('SELECT COALESCE(SUM(amount),0) FROM teacher_payouts WHERE teacher_id=?', [$tid]);
+    $r['balance'] = round($r['earned'] - $r['paid'], 2); return $r;
 }
 function can_view_order(array $o): bool {
     $u = user();

@@ -1,5 +1,5 @@
 <?php
-$p = one('SELECT pr.*,c.title ctitle FROM products pr LEFT JOIN courses c ON c.id=pr.course_id WHERE pr.id=? AND pr.active=1', [$id]);
+$p = one('SELECT pr.*,c.title ctitle,t.name tname FROM products pr LEFT JOIN courses c ON c.id=pr.course_id LEFT JOIN users t ON t.id=pr.teacher_id WHERE pr.id=? AND pr.active=1', [$id]);
 $inst = setting('institute', APP_NAME);
 if (!$p) { http_response_code(404); $pageTitle = 'Product not found'; $pageDesc = ''; require __DIR__ . '/_site_head.php'; echo '<main class="container sec-sm center"><h1>Product not found</h1><a class="btn" href="shop">Back to shop</a></main>'; require __DIR__ . '/_site_foot.php'; return; }
 $out = $p['stock'] !== null && (int)$p['stock'] === 0; $sale = $p['compare_price'] && $p['compare_price'] > $p['price'];
@@ -18,6 +18,7 @@ $free = (float)setting('shop_free_over', '0');
     <div class="pinfo">
       <span class="bcat"><?= e($p['category']) ?></span>
       <h1><?= e($p['title']) ?></h1>
+      <?php if ($p['tname']): ?><p class="muted" style="margin:-4px 0 10px">By <a href="?p=teacher&id=<?= (int)$p['teacher_id'] ?>"><b><?= e($p['tname']) ?></b></a></p><?php endif ?>
       <div class="pprice"><b><?= money($p['price']) ?></b><?php if ($sale): ?><s><?= money($p['compare_price']) ?></s><span class="save">Save <?= money($p['compare_price'] - $p['price']) ?></span><?php endif ?></div>
       <?php if ($p['type'] === 'digital'): ?><p class="stock ok">📄 Digital PDF — download instantly after payment</p>
       <?php elseif ($out): ?><p class="stock bad">Out of stock</p>

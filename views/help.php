@@ -9,7 +9,8 @@ $G = [
    ['Classes, batches & attendance', ["More → Batches & attendance → ＋ New batch (days, time, room, online link).", "Open the batch → add enrolled students.", "Teachers mark attendance daily; absent students' parents get an alert."]],
    ['Fees', ["Fees → Monthly fee plans: vouchers are created every month automatically.", "Generate one-time vouchers (admission / exam fee) for a whole class.", "Open a student → create installments or give a scholarship %.", "Payment proofs (screenshots) arrive in More → Payment proofs — approve to mark paid."]],
    ['Exams, assignments & certificates', ["Teachers create assignments and grade them in More → Assignments.", "More → Exams: add subjects, enter marks, then Publish — result cards go to students and parents.", "Certificates are issued automatically when a course is completed (or issue manually)."]],
-   ['Shop', ["More → Shop products → ＋ Add product (photo, price, stock, or PDF file).", "Link a product to a course so it shows under Required materials.", "New orders appear on Home; update status and courier tracking in Shop orders."]],
+   ['Shop', ["More → Shop products → ＋ Add product (photo, price, stock, or PDF file).", "Link a product to a course so it shows under Required materials.", "New orders appear on Home; update status and courier tracking in Shop orders.", "Select several orders in Shop orders to mark them Shipped or Delivered in one go."]],
+   ['Teacher products & payouts', ["Teachers add their own products; approve them in Shop products → Awaiting approval.", "Set the teacher share % in Settings (default 50%).", "More → Teacher sales & payouts: see each teacher's balance and pay in full or in parts."]],
    ['Money & reports', ["Expenses: add costs with categories; set recurring ones like rent and salaries.", "Teacher payroll: set salary rules, generate slips monthly, mark paid (adds to expenses).", "Reports show income vs expenses for the last 6 months."]],
    ['Website & blog', ["Your public website is at the home URL — edit headline and contact in Settings.", "Blog posts: write articles; teachers' articles need your approval.", "Website pages: About, Privacy, Terms, Disclaimer, Contact — required for AdSense."]],
  ]],
@@ -18,6 +19,7 @@ $G = [
    ['Teach a course', ["Courses → I teach → open your course.", "＋ Lesson: add a YouTube link, notes and attachment link.", "＋ Quiz: add multiple-choice questions with the correct answer."]],
    ['Daily classes', ["Home shows Today's classes — tap to mark attendance.", "After saving, use the WhatsApp buttons to inform absent students."]],
    ['Assignments & exams', ["More → Assignments → ＋ New: set a deadline and total marks; students are notified.", "Open the assignment to see submissions, enter marks and feedback.", "More → Exams → ＋ New exam: add subjects, enter marks, and Publish."]],
+   ['Sell your books & material', ["More → My products → ＋ Add product: photo, price, and PDF file or stock.", "Admin approves it, then it goes live in the shop with your name.", "You earn your share of every delivered sale; physical items ship from the institute warehouse.", "More → My sales & earnings shows sales, balance and payouts."]],
    ['Blog & salary', ["Write articles in More → Blog posts → Submit for review.", "See your salary slips in More → My salary."]],
  ]],
  'student' => ['🎒 Student guide', [

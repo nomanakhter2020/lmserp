@@ -487,16 +487,44 @@ if ($isPost) {
             notify($id, 'Welcome to the teaching team! 🎉', 'You can now create courses and teach students.', '?p=home', '🎤');
             flash('Promoted to teacher'); redirect("?p=user&id=$id");
         case 'product_save':
-            require_role('admin');
+            require_role('admin', 'teacher'); $isT = role('teacher');
+            $old = $id ? one('SELECT * FROM products WHERE id=?', [$id]) : null;
+            if ($id && (!$old || ($isT && (int)$old['teacher_id'] !== (int)$me['id']))) redirect('?p=products');
             try { $img = save_cover('image'); $file = post('type') === 'digital' ? save_upload('file') : ''; } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=product_edit' . ($id ? "&id=$id" : '')); }
-            $data = [post('title'), post('description'), post('category') ?: 'Books', (float)post('price'), post('compare_price') !== '' ? (float)post('compare_price') : null, post('type') === 'digital' ? 'digital' : 'physical', post('stock') !== '' ? (int)post('stock') : null, (int)post('course_id') ?: null, post('active') ? 1 : 0];
-            if ($id) q('UPDATE products SET title=?,description=?,category=?,price=?,compare_price=?,type=?,stock=?,course_id=?,active=? WHERE id=?', [...$data, $id]);
-            else { q('INSERT INTO products(title,description,category,price,compare_price,type,stock,course_id,active) VALUES(?,?,?,?,?,?,?,?,?)', $data); $id = (int)db()->lastInsertId(); }
+            $tid = $isT ? (int)$me['id'] : ((int)post('teacher_id') ?: null);
+            $active = $isT ? 0 : (post('active') ? 1 : 0); $review = $isT ? 'pending' : '';
+            $data = [post('title'), post('description'), post('category') ?: 'Books', (float)post('price'), post('compare_price') !== '' ? (float)post('compare_price') : null, post('type') === 'digital' ? 'digital' : 'physical', post('stock') !== '' ? (int)post('stock') : null, (int)post('course_id') ?: null, $active, $tid, $review];
+            if ($id) q('UPDATE products SET title=?,description=?,category=?,price=?,compare_price=?,type=?,stock=?,course_id=?,active=?,teacher_id=?,review=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO products(title,description,category,price,compare_price,type,stock,course_id,active,teacher_id,review) VALUES(?,?,?,?,?,?,?,?,?,?,?)', $data); $id = (int)db()->lastInsertId(); }
             if ($img) q('UPDATE products SET image=? WHERE id=?', [$img, $id]);
             if ($file) q('UPDATE products SET file=? WHERE id=?', [$file, $id]);
-            flash('Product saved'); redirect("?p=product_edit&id=$id");
+            if ($isT) { notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'Product awaiting approval', $me['name'] . ': ' . post('title'), "?p=product_edit&id=$id", '📚'); flash('Saved and sent to admin for approval'); }
+            else flash('Product saved');
+            redirect("?p=product_edit&id=$id");
+        case 'product_review':
+            require_role('admin'); $pr = one('SELECT * FROM products WHERE id=?', [$id]);
+            if ($pr) { $ok = post('decision') === 'approve';
+                q('UPDATE products SET active=?,review=? WHERE id=?', [$ok ? 1 : 0, $ok ? '' : 'rejected', $id]);
+                if ($pr['teacher_id']) notify((int)$pr['teacher_id'], $ok ? 'Product approved ✓' : 'Product not approved', $pr['title'] . ($ok ? ' is now live in the shop.' : (post('reason') ? ' — ' . post('reason') : '')), "?p=product_edit&id=$id", $ok ? '✅' : '⚠️');
+                flash($ok ? 'Approved — now live in shop' : 'Product rejected'); }
+            redirect('?p=products');
         case 'product_delete':
-            require_role('admin'); q('UPDATE products SET active=0 WHERE id=?', [$id]); flash('Product hidden from shop'); redirect('?p=products');
+            require_role('admin', 'teacher'); q('UPDATE products SET active=0 WHERE id=?' . (role('teacher') ? ' AND teacher_id=' . (int)$me['id'] : ''), [$id]); flash('Product hidden from shop'); redirect('?p=products');
+        case 'payout_save':
+            require_role('admin'); $amt = round((float)post('amount'), 2); $t = one('SELECT id,name FROM users WHERE id=?', [$id]);
+            if ($t && $amt > 0) {
+                $d = post('paid_on') ?: date('Y-m-d');
+                q('INSERT INTO teacher_payouts(teacher_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?)', [$id, $amt, post('method', 'Cash'), post('note'), $d, $me['id']]);
+                $cat = val('SELECT id FROM expense_categories WHERE name="Teacher payouts"'); if (!$cat) { q('INSERT INTO expense_categories(name,icon) VALUES("Teacher payouts","🤝")'); $cat = (int)db()->lastInsertId(); }
+                q('INSERT INTO expenses(title,amount,spent_on,category_id,note) VALUES(?,?,?,?,?)', ['Product sales payout — ' . $t['name'], $amt, $d, $cat, post('method', 'Cash') . (post('note') ? ' · ' . post('note') : '')]);
+                notify($id, 'Payout received 💸', money($amt) . ' paid via ' . post('method', 'Cash') . '. Remaining balance: ' . money(teacher_balance($id)['balance']), '?p=earnings', '💸');
+                flash('Payout of ' . money($amt) . ' recorded');
+            }
+            redirect("?p=earnings&id=$id");
+        case 'payout_delete':
+            require_role('admin'); $po = one('SELECT * FROM teacher_payouts WHERE id=?', [$id]);
+            if ($po) q('DELETE FROM teacher_payouts WHERE id=?', [$id]);
+            flash('Payout removed (delete the matching expense manually if needed)'); redirect('?p=earnings&id=' . (int)($po['teacher_id'] ?? 0));
         case 'cart_add':
             $pr = one('SELECT * FROM products WHERE id=? AND active=1', [$id]); if (!$pr) redirect('?p=shop');
             $q = max(1, (int)post('qty', 1)); $cur = (int)($_SESSION['cart'][$id] ?? 0);
@@ -553,7 +581,7 @@ if ($isPost) {
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title', 'shop_shipping', 'shop_free_over', 'shop_cod'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title', 'shop_shipping', 'shop_free_over', 'shop_cod', 'teacher_share'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
             $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
