@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.7.0';
-const DB_VERSION = 6;
+const APP_VERSION = '1.8.0';
+const DB_VERSION = 7;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -85,6 +85,9 @@ function migrate() {
     foreach (['category_id' => 'INT NULL', 'recurring_id' => 'INT NULL', 'note' => "VARCHAR(255) DEFAULT ''"] as $col => $def)
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='expenses' AND COLUMN_NAME=?", [$col]))
             db()->exec("ALTER TABLE expenses ADD $col $def");
+    foreach (['review' => "VARCHAR(10) NOT NULL DEFAULT ''", 'review_note' => "VARCHAR(255) DEFAULT ''"] as $col => $def)
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='posts' AND COLUMN_NAME=?", [$col]))
+            db()->exec("ALTER TABLE posts ADD $col $def");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);

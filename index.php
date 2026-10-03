@@ -199,11 +199,19 @@ if ($isPost) {
             while (val('SELECT id FROM posts WHERE slug=? AND id<>?', [$slug, $id])) $slug = $base . '-' . $n++;
             try { $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=post_edit' . ($id ? "&id=$id" : '')); }
             $excerpt = post('excerpt') ?: mb_strimwidth(trim(preg_replace('/\s+/', ' ', preg_replace('/[#*>\[\]()-]+/', ' ', post('content')))), 0, 155, '…');
-            $data = [post('title'), $slug, post('category') ?: 'General', $excerpt, post('content'), post('published') ? 1 : 0];
-            if ($id) q('UPDATE posts SET title=?,slug=?,category=?,excerpt=?,content=?,published=? WHERE id=?', [...$data, $id]);
-            else { q('INSERT INTO posts(title,slug,category,excerpt,content,published,author_id) VALUES(?,?,?,?,?,?,?)', [...$data, $me['id']]); $id = (int)db()->lastInsertId(); }
+            // Admin publishes directly; teachers can only save a draft or submit for review.
+            if (role('admin')) { $pub = post('published') ? 1 : 0; $review = $pub ? '' : ($old['review'] ?? ''); }
+            else { $pub = 0; $review = post('submit_review') ? 'pending' : ''; }
+            $data = [post('title'), $slug, post('category') ?: 'General', $excerpt, post('content'), $pub, $review];
+            if ($id) q('UPDATE posts SET title=?,slug=?,category=?,excerpt=?,content=?,published=?,review=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO posts(title,slug,category,excerpt,content,published,review,author_id) VALUES(?,?,?,?,?,?,?,?)', [...$data, $me['id']]); $id = (int)db()->lastInsertId(); }
             if ($cover) { if ($old && $old['cover']) @unlink(UPLOAD_DIR . '/covers/' . basename($old['cover'])); q('UPDATE posts SET cover=? WHERE id=?', [$cover, $id]); }
-            flash('Article saved'); redirect("?p=post_edit&id=$id");
+            flash(role('admin') ? 'Article saved' : ($review === 'pending' ? 'Submitted for review. It will go live after admin approval.' : 'Draft saved')); redirect("?p=post_edit&id=$id");
+        case 'post_review':
+            require_role('admin');
+            if (post('decision') === 'approve') { q('UPDATE posts SET published=1,review="",review_note="",created_at=IF(published=0 AND views=0,NOW(),created_at) WHERE id=?', [$id]); flash('Article approved and published'); }
+            else { q('UPDATE posts SET published=0,review="rejected",review_note=? WHERE id=?', [post('note'), $id]); flash('Article sent back to the teacher'); }
+            redirect(post('back', '?p=posts&f=pending'));
         case 'post_delete':
             $old = one('SELECT * FROM posts WHERE id=?', [$id]);
             if (!$old || (!role('admin') && (int)$old['author_id'] !== (int)$me['id'])) exit('Not allowed');

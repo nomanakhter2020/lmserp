@@ -127,3 +127,4 @@ body.auth{min-height:100vh;display:grid;place-items:center;padding:20px;backgrou
 .cb-top{display:flex;justify-content:space-between;font-size:14px;font-weight:600}
 .fmt{font-size:13px;color:var(--mu);margin:0 0 12px}.fmt code{background:var(--bg);padding:1px 5px;border-radius:5px}
 .msg.unread{border-color:var(--p)}.msg .subj{display:block;margin-top:6px}.msg p{margin:6px 0 10px}
+.review-box{border-color:var(--warn)}.review-box h3{margin-top:0}.review-box .two .btn{width:100%}

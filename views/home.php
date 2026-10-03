@@ -27,6 +27,7 @@ if (role('admin')):
   <a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
 </div>
 <?php if ($np = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')): ?><a class="alert warn" href="?p=proofs" style="display:block">🧾 <?= $np ?> payment proof<?= $np > 1 ? 's' : '' ?> waiting for verification ›</a><?php endif ?>
+<?php if ($nr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')): ?><a class="alert warn" href="?p=posts&f=pending" style="display:block">✍️ <?= $nr ?> blog article<?= $nr > 1 ? 's' : '' ?> waiting for your approval ›</a><?php endif ?>
 <?php if ($pending): ?>
 <h2>Pending enrollments</h2>
 <div class="list"><?php foreach ($pending as $r): ?>
@@ -43,7 +44,10 @@ if (role('admin')):
   $tot = array_sum(array_column($cs, 'st'));
 ?>
 <div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>My courses</span></div><div class="stat"><b><?= $tot ?></b><span>Students</span></div></div>
-<div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=announcements">📣 Announce</a></div>
+<?php $myp = one('SELECT SUM(published) live, SUM(review="pending") pend, SUM(review="rejected") rej, MAX(created_at) last FROM posts WHERE author_id=?', [$me['id']]); ?>
+<div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=post_edit">✍️ Write article</a><a href="?p=announcements">📣 Announce</a></div>
+<?php if ((int)$myp['rej']): ?><a class="alert err" href="?p=posts" style="display:block">↩️ <?= (int)$myp['rej'] ?> article<?= $myp['rej'] > 1 ? 's' : '' ?> need changes — see admin notes ›</a>
+<?php elseif (!$myp['last'] || strtotime($myp['last']) < strtotime('-7 days')): ?><a class="alert" href="?p=post_edit" style="display:block">✍️ Share your knowledge — write a blog article this week. It helps students find your courses on Google. ›</a><?php endif ?>
 <h2>My courses</h2>
 <div class="grid"><?php foreach ($cs as $c): ?>
   <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>"><div class="band<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"></div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= $c['st'] ?> students</small></a>

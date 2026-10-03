@@ -3,7 +3,7 @@ $title = 'More';
 $items = [
   ['teachers', '👩‍🏫', 'Our teachers', true],
   ['announcements', '📣', 'Announcements', true],
-  ['posts', '✍️', 'Blog posts', role('admin', 'teacher')],
+  ['posts', '✍️', 'Blog posts' . (role('admin') && ($pr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')) ? " ($pr pending)" : ''), role('admin', 'teacher')],
   ['messages', '📬', 'Contact messages' . (role('admin') && ($m = (int)val('SELECT COUNT(*) FROM contact_messages WHERE is_read=0')) ? " ($m)" : ''), role('admin')],
   ['pages_edit', '📄', 'Website pages', role('admin')],
   ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
