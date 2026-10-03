@@ -29,6 +29,11 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <div class="list"><?php foreach ($ens as $e): $pc = course_progress($id, (int)$e['course_id']); ?>
   <div class="row col"><div class="rowhead"><a href="?p=course&id=<?= $e['course_id'] ?>"><b><?= e($e['title']) ?></b></a><span class="pill <?= $e['status'] === 'pending' ? 'warn' : ($e['status'] === 'completed' ? 'ok' : '') ?>"><?= ucfirst($e['status']) ?></span></div>
   <div class="bar"><i style="width:<?= $pc ?>%"></i></div><small><?= $pc ?>% · fee <?= money($e['fee']) ?></small>
+  <?php $ce = one('SELECT * FROM certificates WHERE user_id=? AND course_id=?', [$id, $e['course_id']]); if ($ce && !$ce['revoked']): ?>
+    <div class="actions"><a class="btn sm ghost" href="?p=cert&c=<?= e($ce['code']) ?>" target="_blank">🎓 <?= e($ce['code']) ?></a><?php if (role('admin')): ?><form method="post" onsubmit="return confirm('Revoke certificate?')"><?= csrf_field() ?><input type="hidden" name="a" value="cert_revoke"><input type="hidden" name="id" value="<?= $ce['id'] ?>"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>"><button class="btn sm danger">Revoke</button></form><?php endif ?></div>
+  <?php elseif (can_manage_course(['teacher_id' => $e['teacher_id']]) && $e['status'] !== 'pending'): ?>
+    <form method="post" class="inline" style="margin-top:6px"><?= csrf_field() ?><input type="hidden" name="a" value="cert_issue"><input type="hidden" name="user_id" value="<?= $id ?>"><input type="hidden" name="course_id" value="<?= $e['course_id'] ?>"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>"><select name="grade" style="margin:0"><option value="">Auto grade</option><option>Distinction</option><option>Merit</option><option>Pass</option></select><button class="btn sm">🎓 Issue certificate</button></form>
+  <?php endif ?>
   <?php if (role('admin') && $e['status'] === 'pending'): ?>
     <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="enroll_admin"><input type="hidden" name="user_id" value="<?= $id ?>"><input type="hidden" name="course_id" value="<?= $e['course_id'] ?>"><input type="hidden" name="status" value="active"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>"><button class="btn sm">Approve access</button></form>
   <?php endif ?></div>

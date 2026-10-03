@@ -279,3 +279,25 @@ function pay_voucher(int $vid, float $amount, string $method, string $date, stri
     if ($v['course_id']) q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [$v['user_id'], $v['course_id']]);
     return $pid;
 }
+
+/* ---------------- Certificates ---------------- */
+function cert_eligibility(int $uid, int $cid): array {
+    if (course_progress($uid, $cid) < 100) return [false, 'Complete all lessons first'];
+    foreach (all('SELECT id,title,pass_percent FROM quizzes WHERE course_id=?', [$cid]) as $q) {
+        $best = val('SELECT MAX(ROUND(score*100/NULLIF(total,0))) FROM attempts WHERE quiz_id=? AND user_id=?', [$q['id'], $uid]);
+        if ($best === null || $best === false || (int)$best < (int)$q['pass_percent']) return [false, 'Pass the quiz: ' . $q['title']];
+    }
+    return [true, ''];
+}
+function cert_grade(int $uid, int $cid): string {
+    $avg = val('SELECT AVG(b) FROM (SELECT MAX(score*100/NULLIF(total,0)) b FROM attempts a JOIN quizzes q ON q.id=a.quiz_id WHERE q.course_id=? AND a.user_id=? GROUP BY a.quiz_id) x', [$cid, $uid]);
+    if ($avg === null || $avg === false) return '';
+    return $avg >= 85 ? 'Distinction' : ($avg >= 70 ? 'Merit' : 'Pass');
+}
+function issue_certificate(int $uid, int $cid, ?string $grade = null): string {
+    if ($code = val('SELECT code FROM certificates WHERE user_id=? AND course_id=?', [$uid, $cid])) { q('UPDATE certificates SET revoked=0 WHERE user_id=? AND course_id=?', [$uid, $cid]); return $code; }
+    do { $code = 'C' . strtoupper(substr(str_replace(['0', 'O', '1', 'I'], '', bin2hex(random_bytes(8))), 0, 4) . '-' . substr(strtoupper(bin2hex(random_bytes(3))), 0, 4)); } while (val('SELECT id FROM certificates WHERE code=?', [$code]));
+    q('INSERT INTO certificates(user_id,course_id,code,grade,issued_by) VALUES(?,?,?,?,?)', [$uid, $cid, $code, $grade ?? cert_grade($uid, $cid), user()['id'] ?? null]);
+    q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$uid, $cid]);
+    return $code;
+}

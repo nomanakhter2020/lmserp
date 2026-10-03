@@ -66,7 +66,10 @@ if ($isPost) {
             q('INSERT IGNORE INTO progress(user_id,lesson_id) VALUES(?,?)', [$me['id'], $id]);
             $l = one('SELECT * FROM lessons WHERE id=?', [$id]);
             $next = val('SELECT id FROM lessons WHERE course_id=? AND (sort>? OR (sort=? AND id>?)) ORDER BY sort,id LIMIT 1', [$l['course_id'], $l['sort'], $l['sort'], $id]);
-            if (course_progress((int)$me['id'], (int)$l['course_id']) >= 100) q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$me['id'], $l['course_id']]);
+            if (course_progress((int)$me['id'], (int)$l['course_id']) >= 100) {
+                q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$me['id'], $l['course_id']]);
+                if (setting('cert_auto', '1') === '1' && cert_eligibility((int)$me['id'], (int)$l['course_id'])[0]) { issue_certificate((int)$me['id'], (int)$l['course_id']); flash('🎓 Congratulations! You completed the course — your certificate is ready.'); }
+            }
             redirect($next ? "?p=lesson&id=$next" : "?p=course&id={$l['course_id']}");
         case 'enroll':
             $c = one('SELECT * FROM courses WHERE id=? AND published=1', [$id]); if (!$c || !can_enroll($c)) redirect('?p=courses');
@@ -96,11 +99,25 @@ if ($isPost) {
         case 'quiz_delete':
             $qz = one('SELECT qz.*,c.teacher_id FROM quizzes qz JOIN courses c ON c.id=qz.course_id WHERE qz.id=?', [$id]); if (!$qz || !can_manage_course($qz)) exit('Not allowed');
             q('DELETE FROM questions WHERE quiz_id=?', [$id]); q('DELETE FROM quizzes WHERE id=?', [$id]); redirect("?p=course&id={$qz['course_id']}");
+        case 'cert_claim':
+            $ok = cert_eligibility((int)$me['id'], $id);
+            if (!$ok[0] || setting('cert_auto', '1') !== '1') { flash($ok[1] ?: 'Certificates for this course are issued by the admin.', 'err'); redirect("?p=course&id=$id"); }
+            redirect('?p=cert&c=' . issue_certificate((int)$me['id'], $id));
+        case 'cert_issue':
+            $c = one('SELECT * FROM courses WHERE id=?', [(int)post('course_id')]); if (!$c || !can_manage_course($c)) exit('Not allowed');
+            $code = issue_certificate((int)post('user_id'), (int)$c['id'], post('grade') !== '' ? post('grade') : null);
+            flash("Certificate issued ($code)"); redirect(post('back', '?p=certificates'));
+        case 'cert_revoke':
+            require_role('admin'); q('UPDATE certificates SET revoked=1 WHERE id=?', [$id]); flash('Certificate revoked'); redirect(post('back', '?p=certificates'));
         case 'quiz_submit':
             $qs = all('SELECT id,answer FROM questions WHERE quiz_id=?', [$id]); $score = 0;
             foreach ($qs as $qq) if (($_POST['q'][$qq['id']] ?? '') === $qq['answer']) $score++;
             q('INSERT INTO attempts(quiz_id,user_id,score,total) VALUES(?,?,?,?)', [$id, $me['id'], $score, count($qs)]);
-            redirect("?p=quiz_result&id=" . db()->lastInsertId());
+            $aid = db()->lastInsertId();
+            $qcid = (int)val('SELECT course_id FROM quizzes WHERE id=?', [$id]);
+            if (setting('cert_auto', '1') === '1' && !val('SELECT id FROM certificates WHERE user_id=? AND course_id=?', [$me['id'], $qcid]) && cert_eligibility((int)$me['id'], $qcid)[0]) { issue_certificate((int)$me['id'], $qcid); flash('🎓 Course completed — your certificate is ready!'); }
+            redirect("?p=quiz_result&id=" . $aid);
+
         case 'user_save':
             require_role('admin');
             $role = in_array(post('role'), ['admin', 'teacher', 'student'], true) ? post('role') : 'student';
@@ -307,7 +324,7 @@ if ($isPost) {
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
             $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
@@ -361,6 +378,7 @@ if ($p === 'proof_file') {
     readfile($path); exit;
 }
 if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
+if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if ($p === 'robots') { header('Content-Type: text/plain'); echo "User-agent: *\nAllow: /\nDisallow: /install.php\nDisallow: /*?p=login\nDisallow: /*?p=register\n\nSitemap: " . abs_url('sitemap.xml') . "\n"; exit; }
 if ($p === 'adstxt') { header('Content-Type: text/plain'); $c = adsense_client(); echo $c ? 'google.com, ' . str_replace('ca-', '', $c) . ", DIRECT, f08c47fec0942fa0\n" : "# AdSense publisher ID not set yet\n"; exit; }
