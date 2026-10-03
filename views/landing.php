@@ -48,7 +48,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
       <span class="badge">🎓 Admissions open</span>
       <h1><?= e($tag) ?></h1>
       <p><?= e($about) ?></p>
-      <div class="hero-cta"><a class="btn lg" href="<?= $cta ?>">Start learning →</a><a class="btn-o lg" href="#courses">Browse courses</a></div>
+      <div class="hero-cta"><a class="btn lg" href="<?= $cta ?>">Start learning →</a><a class="btn-o lg" href="#courses">Browse courses</a></div><?php if (!$me && $canReg): ?><p class="hero-par">👨‍👩‍👧 Parent? <a href="?p=register&as=parent"><b>Register your child for homeschooling →</b></a></p><?php endif ?>
       <div class="trust"><span>✓ Learn on mobile</span><span>✓ Quizzes &amp; progress</span><span>✓ Easy JazzCash / EasyPaisa fee</span></div>
     </div>
     <div class="hero-art" aria-hidden="true">

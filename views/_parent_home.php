@@ -1,6 +1,13 @@
 <?php
 $kids = my_children();
-if (!$kids): ?><p class="empty">No student is linked to your account yet. Please contact the institute.</p><?php return; endif;
+?>
+<details class="card guide" <?= $kids ? '' : 'open' ?>><summary>＋ Add a child</summary>
+<form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="child_add">
+  <label>Child's name<input name="name" required></label>
+  <p class="muted" style="font-size:13px;margin:0 0 8px">Optional — give your child their own login to watch lessons and submit homework:</p>
+  <div class="two"><label>Child's email<input name="email" type="email"></label><label>Password<input name="password" type="text" minlength="6" autocomplete="new-password"></label></div>
+  <button class="btn block">Add child</button></form></details>
+<?php if (!$kids) return;
 foreach ($kids as $k): $kid = (int)$k['id'];
   $att = att_percent($kid);
   $cs = all('SELECT c.id,c.title,e.status FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=?', [$kid]);

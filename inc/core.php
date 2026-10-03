@@ -5,7 +5,7 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.5.1';
 const DB_VERSION = 15;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
@@ -330,6 +330,19 @@ function course_student_ids(int $cid, ?int $bid = null): array {
 }
 function unread_count(): int { return user() ? (int)val('SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0', [user()['id']]) : 0; }
 function my_children(): array { return user() ? all('SELECT u.*,pl.relation FROM parent_links pl JOIN users u ON u.id=pl.student_id WHERE pl.parent_id=? ORDER BY u.name', [user()['id']]) : []; }
+// Parent adds a child: creates a student account (login optional) and links it
+function add_child(int $pid, string $name, string $email = '', string $pw = ''): int|string {
+    $name = trim($name); if ($name === '') return "Enter the child's name";
+    $email = strtolower(trim($email));
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) return 'Child email is not valid';
+    if ($email !== '' && val('SELECT id FROM users WHERE email=?', [$email])) return 'That child email is already registered';
+    if ($email !== '' && strlen($pw) < 6) return "Child password must be 6+ characters";
+    if ($email === '') { $email = 'child' . bin2hex(random_bytes(5)) . '@student.local'; $pw = bin2hex(random_bytes(8)); }
+    q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,"student")', [mb_substr($name, 0, 120), $email, val('SELECT phone FROM users WHERE id=?', [$pid]) ?: '', password_hash($pw, PASSWORD_DEFAULT)]);
+    $sid = (int)db()->lastInsertId();
+    q('INSERT IGNORE INTO parent_links(parent_id,student_id,relation) VALUES(?,?,?)', [$pid, $sid, 'Parent']);
+    return $sid;
+}
 function is_parent_of(int $sid): bool { return (bool)val('SELECT 1 FROM parent_links WHERE parent_id=? AND student_id=?', [user()['id'] ?? 0, $sid]); }
 
 /* ---------------- Exams & results ---------------- */

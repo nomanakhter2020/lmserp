@@ -7,6 +7,6 @@
   <label>Email<input name="email" type="email" autocomplete="username" required></label>
   <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
   <button class="btn block">Sign in</button>
-  <?php if (setting('allow_register', '1') === '1'): ?><p class="center">New student? <a href="?p=register">Create account</a></p><?php endif ?>
+  <?php if (setting('allow_register', '1') === '1'): ?><p class="center">New here? <a href="?p=register">Student sign up</a> · <a href="?p=register&as=parent">Parent sign up</a></p><?php endif ?>
   <p class="center"><a href="./">← Back to website</a></p>
 </form>

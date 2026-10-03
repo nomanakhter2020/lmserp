@@ -20,8 +20,14 @@ if ($isPost) {
             if (setting('allow_register', '1') !== '1') redirect('?p=login');
             if (!filter_var(post('email'), FILTER_VALIDATE_EMAIL) || strlen((string)$_POST['password']) < 6) { flash('Valid email and 6+ char password required', 'err'); redirect('?p=register'); }
             if (val('SELECT id FROM users WHERE email=?', [post('email')])) { flash('Email already registered', 'err'); redirect('?p=register'); }
-            q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,"student")', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT)]);
-            $_SESSION['uid'] = db()->lastInsertId(); redirect('./');
+            $isP = post('as') === 'parent';
+            if ($isP && trim((string)post('child_name')) === '') { flash("Please enter your child's name", 'err'); redirect('?p=register&as=parent'); }
+            q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,?)', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), $isP ? 'parent' : 'student']);
+            $uid = (int)db()->lastInsertId(); $_SESSION['uid'] = $uid;
+            if ($isP) { foreach (array_filter(array_map('trim', explode(',', (string)post('child_name')))) as $cn) add_child($uid, $cn);
+                notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New parent registered', post('name') . ' · ' . post('phone'), "?p=user&id=$uid", '👨‍👩‍👧');
+                flash('Welcome! Your children are added — enroll them in a course from Courses.'); }
+            redirect('./');
     }
     if (in_array($a, ['store_add', 'store_update', 'store_checkout'], true)) {
         if ($a === 'store_add') {
@@ -456,6 +462,9 @@ if ($isPost) {
             flash('Salary marked paid and added to expenses'); redirect("?p=slip&id=$id");
         case 'slip_delete':
             require_role('admin'); q('DELETE FROM salary_slips WHERE id=? AND status="unpaid"', [$id]); flash('Slip deleted'); redirect('?p=payroll');
+        case 'child_add':
+            require_role('parent'); $r = add_child((int)$me['id'], (string)post('name'), (string)post('email'), (string)($_POST['password'] ?? ''));
+            flash(is_int($r) ? post('name') . ' added' : $r, is_int($r) ? 'ok' : 'err'); redirect('?p=home');
         case 'parent_add':
             require_role('admin');
             $sid = (int)post('student_id'); $email = strtolower(post('email'));

@@ -29,6 +29,7 @@ $G = [
    ['Fees, shop & certificate', ["More → My fees: pay vouchers and download receipts.", "Shop: buy task books and materials — pay cash on delivery or online.", "Finish all lessons and pass quizzes to get your certificate 🎓."]],
  ]],
  'parent' => ['👨‍👩‍👧 Parent guide', [
+   ['Sign up & add children', ["On the login page tap Parent sign up (or 'Register your child' on the website).", "Enter your details and your child's name — add more children later from Home → ＋ Add a child.", "Optionally give a child their own email & password to watch lessons and submit homework."]],
    ['Your dashboard', ["Home shows each child's attendance, latest result, fees due and pending homework.", "You'll get notifications for absences, results, new vouchers and payment approvals."]],
    ['Enroll your child', ["Courses → open a course → Enroll your child → choose the child.", "A fee voucher is created — pay it from Fees."]],
    ['Pay fees', ["Fees → open a voucher → pay by JazzCash, EasyPaisa or bank.", "Upload the payment screenshot — you'll be notified when it's approved.", "Download or print receipts any time."]],
