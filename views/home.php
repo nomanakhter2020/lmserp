@@ -24,7 +24,7 @@ if (role('admin')):
 </div>
 <div class="stats"><?php foreach ($s as $k => $v): ?><div class="stat"><b><?= (int)$v ?></b><span><?= $k ?></span></div><?php endforeach ?></div>
 <div class="quick">
-  <a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
+  <a href="?p=batches">🗓️ Batches</a><a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
 </div>
 <?php if ($np = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')): ?><a class="alert warn" href="?p=proofs" style="display:block">🧾 <?= $np ?> payment proof<?= $np > 1 ? 's' : '' ?> waiting for verification ›</a><?php endif ?>
 <?php if ($nr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')): ?><a class="alert warn" href="?p=posts&f=pending" style="display:block">✍️ <?= $nr ?> blog article<?= $nr > 1 ? 's' : '' ?> waiting for your approval ›</a><?php endif ?>
@@ -48,6 +48,7 @@ if (role('admin')):
 <div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=post_edit">✍️ Write article</a><a href="?p=announcements">📣 Announce</a></div>
 <?php if ((int)$myp['rej']): ?><a class="alert err" href="?p=posts" style="display:block">↩️ <?= (int)$myp['rej'] ?> article<?= $myp['rej'] > 1 ? 's' : '' ?> need changes — see admin notes ›</a>
 <?php elseif (!$myp['last'] || strtotime($myp['last']) < strtotime('-7 days')): ?><a class="alert" href="?p=post_edit" style="display:block">✍️ Share your knowledge — write a blog article this week. It helps students find your courses on Google. ›</a><?php endif ?>
+<?php require __DIR__ . '/_today.php'; ?>
 <?php $learn = all('SELECT c.*,e.status FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ORDER BY e.id DESC LIMIT 4', [$me['id']]); if ($learn): ?>
 <div class="rowhead sec-t"><h2>My learning</h2><a href="?p=my">See all ›</a></div>
 <div class="list"><?php foreach ($learn as $l): $pc = course_progress((int)$me['id'], (int)$l['id']); ?>
@@ -67,7 +68,9 @@ if (role('admin')):
   $cont = null;
   foreach ($cs as $c) { if ($c['status'] === 'active' && course_progress((int)$me['id'], (int)$c['id']) < 100) { $cont = $c; break; } }
 ?>
-<div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>Courses</span></div><div class="stat"><b><?= $done ?></b><span>Lessons done</span></div><div class="stat"><b><?= $avg !== null ? $avg . '%' : '–' ?></b><span>Quiz avg</span></div></div>
+<?php $attp = att_percent((int)$me['id']); ?>
+<div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>Courses</span></div><div class="stat"><b><?= $done ?></b><span>Lessons done</span></div><div class="stat"><b><?= $avg !== null ? $avg . '%' : '–' ?></b><span>Quiz avg</span></div><?php if ($attp !== null): ?><div class="stat"><b class="<?= $attp < 75 ? 'neg' : 'pos' ?>"><?= $attp ?>%</b><span>Attendance</span></div><?php endif ?></div>
+<?php require __DIR__ . '/_today.php'; ?>
 <?php if ($cont): $pc = course_progress((int)$me['id'], (int)$cont['id']);
   $nx = val('SELECT l.id FROM lessons l LEFT JOIN progress p ON p.lesson_id=l.id AND p.user_id=? WHERE l.course_id=? AND p.lesson_id IS NULL ORDER BY l.sort,l.id LIMIT 1', [$me['id'], $cont['id']]); ?>
 <a class="hero" href="<?= $nx ? "?p=lesson&id=$nx" : "?p=course&id={$cont['id']}" ?>" style="--c:<?= e($cont['color']) ?>">

@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.9.0';
-const DB_VERSION = 8;
+const APP_VERSION = '2.0.0';
+const DB_VERSION = 9;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -90,6 +90,8 @@ function migrate() {
             db()->exec("ALTER TABLE posts ADD $col $def");
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='enrollments' AND COLUMN_NAME='fee'"))
         db()->exec("ALTER TABLE enrollments ADD fee DECIMAL(12,2) NULL");
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='enrollments' AND COLUMN_NAME='discount'"))
+        db()->exec("ALTER TABLE enrollments ADD discount TINYINT NOT NULL DEFAULT 0");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -232,3 +234,14 @@ function course_fee_for(array $c, ?array $u = null): float {
     return $fee;
 }
 function can_enroll(array $c): bool { return role('student') || (role('teacher') && (int)$c['teacher_id'] !== (int)user()['id']); }
+
+/* ---------------- Batches & attendance ---------------- */
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const ATT = ['P' => ['Present', 'ok'], 'A' => ['Absent', 'err'], 'L' => ['Late', 'warn'], 'E' => ['Leave', '']];
+function can_manage_batch(array $b): bool { return role('admin') || (role('teacher') && ((int)$b['teacher_id'] === (int)user()['id'] || (int)val('SELECT teacher_id FROM courses WHERE id=?', [$b['course_id']]) === (int)user()['id'])); }
+function batch_time(array $b): string { return $b['start_time'] ? date('g:i a', strtotime($b['start_time'])) . ($b['end_time'] ? ' – ' . date('g:i a', strtotime($b['end_time'])) : '') : ''; }
+function att_percent(int $uid, ?int $bid = null): ?int {
+    $r = one('SELECT COUNT(*) t, SUM(status IN ("P","L")) p FROM attendance WHERE user_id=?' . ($bid ? ' AND batch_id=' . (int)$bid : ''), [$uid]);
+    return $r['t'] ? (int)round($r['p'] * 100 / $r['t']) : null;
+}
+function wa_num(string $phone): string { $w = preg_replace('/\D/', '', $phone); return str_starts_with($w, '0') ? '92' . substr($w, 1) : $w; }

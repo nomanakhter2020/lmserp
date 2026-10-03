@@ -228,6 +228,35 @@ if ($isPost) {
             require __DIR__ . '/inc/blog_seed.php';
             $n = blog_seed();
             flash("$n starter articles added to the blog"); redirect('?p=posts');
+        case 'batch_save':
+            require_role('admin', 'teacher');
+            $cid = (int)post('course_id'); $c = one('SELECT * FROM courses WHERE id=?', [$cid]);
+            if (!$c || !can_manage_course($c)) exit('Not allowed');
+            if ($id) { $b = one('SELECT * FROM batches WHERE id=?', [$id]); if (!$b || !can_manage_batch($b)) exit('Not allowed'); }
+            $days = implode(',', array_intersect(WEEKDAYS, (array)($_POST['days'] ?? [])));
+            $data = [$cid, post('name'), role('admin') ? ((int)post('teacher_id') ?: $c['teacher_id']) : $me['id'], $days, post('start_time') ?: null, post('end_time') ?: null, post('room'), post('meet_link'), post('start_date') ?: null, post('active') ? 1 : 0];
+            if ($id) q('UPDATE batches SET course_id=?,name=?,teacher_id=?,days=?,start_time=?,end_time=?,room=?,meet_link=?,start_date=?,active=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO batches(course_id,name,teacher_id,days,start_time,end_time,room,meet_link,start_date,active) VALUES(?,?,?,?,?,?,?,?,?,?)', $data); $id = (int)db()->lastInsertId(); }
+            flash('Batch saved'); redirect("?p=batch&id=$id");
+        case 'batch_delete':
+            require_role('admin'); q('DELETE FROM batch_students WHERE batch_id=?', [$id]); q('DELETE FROM attendance WHERE batch_id=?', [$id]); q('DELETE FROM batches WHERE id=?', [$id]);
+            flash('Batch deleted'); redirect('?p=batches');
+        case 'batch_students':
+            $b = one('SELECT * FROM batches WHERE id=?', [$id]); if (!$b || !can_manage_batch($b)) exit('Not allowed');
+            if (post('remove')) q('DELETE FROM batch_students WHERE batch_id=? AND user_id=?', [$id, (int)post('remove')]);
+            foreach ((array)($_POST['add'] ?? []) as $uid) q('INSERT IGNORE INTO batch_students(batch_id,user_id) VALUES(?,?)', [$id, (int)$uid]);
+            if (post('add_all')) q('INSERT IGNORE INTO batch_students(batch_id,user_id) SELECT ?,user_id FROM enrollments WHERE course_id=? AND status<>"pending" AND user_id NOT IN (SELECT bs.user_id FROM batch_students bs JOIN batches bb ON bb.id=bs.batch_id WHERE bb.course_id=?)', [$id, $b['course_id'], $b['course_id']]);
+            flash('Students updated'); redirect("?p=batch&id=$id");
+        case 'attendance_save':
+            $b = one('SELECT * FROM batches WHERE id=?', [$id]); if (!$b || !can_manage_batch($b)) exit('Not allowed');
+            $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', post('date')) ? post('date') : date('Y-m-d');
+            if ($d > date('Y-m-d')) { flash('Cannot mark attendance for a future date', 'err'); redirect("?p=attendance&id=$id"); }
+            $n = 0;
+            foreach ((array)($_POST['st'] ?? []) as $uid => $st) {
+                if (!isset(ATT[$st])) continue;
+                q('REPLACE INTO attendance(batch_id,user_id,att_date,status,marked_by) VALUES(?,?,?,?,?)', [$id, (int)$uid, $d, $st, $me['id']]); $n++;
+            }
+            flash("Attendance saved for $n students"); redirect("?p=attendance&id=$id&date=$d&saved=1");
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':

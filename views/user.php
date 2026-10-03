@@ -54,6 +54,9 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <?php endforeach ?></div>
 <?php endif ?>
 
+<?php $ub = all('SELECT b.id,b.name,c.title FROM batch_students s JOIN batches b ON b.id=s.batch_id JOIN courses c ON c.id=b.course_id WHERE s.user_id=?', [$id]); if ($ub): ?><h2>Batches & attendance</h2><div class="list"><?php foreach ($ub as $x): $ap = att_percent($id, (int)$x['id']); ?>
+  <a class="row" href="?p=batch&id=<?= $x['id'] ?>"><div class="grow"><b><?= e($x['name']) ?></b><small><?= e($x['title']) ?></small></div><?php if ($ap !== null): ?><span class="pill <?= $ap >= 75 ? 'ok' : ($ap >= 50 ? 'warn' : 'err') ?>"><?= $ap ?>%</span><?php endif ?></a>
+<?php endforeach ?></div><?php endif ?>
 <?php if ($atts): ?><h2>Quiz attempts</h2><div class="list"><?php foreach ($atts as $a): ?>
   <div class="row"><div class="grow"><b><?= e($a['title']) ?></b><small><?= date('d M Y', strtotime($a['created_at'])) ?></small></div><span class="pill"><?= $a['score'] ?>/<?= $a['total'] ?></span></div>
 <?php endforeach ?></div><?php endif ?>

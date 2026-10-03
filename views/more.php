@@ -1,6 +1,7 @@
 <?php
 $title = 'More';
 $items = [
+  ['batches', '🗓️', 'Batches & attendance', role('admin', 'teacher')],
   ['teachers', '👩‍🏫', 'Our teachers', true],
   ['announcements', '📣', 'Announcements', true],
   ['posts', '✍️', 'Blog posts' . (role('admin') && ($pr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')) ? " ($pr pending)" : ''), role('admin', 'teacher')],

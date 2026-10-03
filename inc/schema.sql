@@ -200,3 +200,81 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+CREATE TABLE IF NOT EXISTS batches (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  teacher_id INT NULL,
+  days VARCHAR(40) DEFAULT 'Mon,Tue,Wed,Thu,Fri',
+  start_time TIME NULL,
+  end_time TIME NULL,
+  room VARCHAR(80) DEFAULT '',
+  meet_link VARCHAR(300) DEFAULT '',
+  start_date DATE NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(course_id), INDEX(teacher_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS batch_students (
+  batch_id INT NOT NULL,
+  user_id INT NOT NULL,
+  added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (batch_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS attendance (
+  batch_id INT NOT NULL,
+  user_id INT NOT NULL,
+  att_date DATE NOT NULL,
+  status CHAR(1) NOT NULL DEFAULT 'P',
+  marked_by INT NULL,
+  marked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (batch_id, user_id, att_date),
+  INDEX(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fee_vouchers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  course_id INT NULL,
+  title VARCHAR(160) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  discount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  late_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+  due_date DATE NOT NULL,
+  status ENUM('unpaid','paid','cancelled') NOT NULL DEFAULT 'unpaid',
+  paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  paid_on DATE NULL,
+  payment_id INT NULL,
+  plan_id INT NULL,
+  period VARCHAR(7) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(user_id), INDEX(status), INDEX(due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fee_plans (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  due_day TINYINT NOT NULL DEFAULT 10,
+  late_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+  generate_day TINYINT NOT NULL DEFAULT 1,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  last_period VARCHAR(7) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS certificates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  course_id INT NOT NULL,
+  code VARCHAR(20) NOT NULL UNIQUE,
+  grade VARCHAR(40) DEFAULT '',
+  issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  issued_by INT NULL,
+  revoked TINYINT(1) NOT NULL DEFAULT 0,
+  UNIQUE KEY uc (user_id, course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
