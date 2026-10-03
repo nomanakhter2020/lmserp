@@ -17,6 +17,7 @@ if (role('admin')):
   $recent = all('SELECT p.*,u.name FROM payments p JOIN users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 5');
   $pending = all('SELECT e.*,u.name,c.title,c.fee FROM enrollments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id WHERE e.status="pending" ORDER BY e.id DESC LIMIT 5');
 ?>
+<?php require __DIR__ . '/_checklist.php'; ?>
 <div class="hero">
   <div class="muted-l"><?= date('F Y') ?></div>
   <div class="big"><?= money($inc - $exp) ?></div><div class="muted-l">Net this month</div>

@@ -30,3 +30,7 @@ DirectoryIndex index.php
   ExpiresByType image/svg+xml "access plus 30 days"
   ExpiresByType image/png "access plus 30 days"
 </IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteRule ^tools/ - [F,L]
+</IfModule>

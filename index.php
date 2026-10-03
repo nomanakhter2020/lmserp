@@ -535,6 +535,11 @@ if ($isPost) {
         case 'shop_clear':
             require_role('admin'); require __DIR__ . '/inc/shop_seed.php';
             [$p, $o, $u] = shop_demo_clear(); flash("Removed $p demo products, $o demo orders and $u demo students/parents"); redirect('?p=settings#demo');
+        case 'checklist_hide':
+            require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("checklist_hidden","1")'); redirect('./');
+        case 'guide_seed':
+            require_role('admin'); require __DIR__ . '/inc/guide_seed.php';
+            [$c, $l] = guide_seed(); flash("Study material ready: $c new programme courses, $l study guides added to existing courses."); redirect('?p=courses');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
