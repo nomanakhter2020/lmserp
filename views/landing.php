@@ -33,11 +33,11 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   <div class="container nav-in">
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
-      <a href="#courses">Courses</a><?php if ($teachers): ?><a href="#teachers">Teachers</a><?php endif ?><a href="#why">Why us</a><a href="#how">How it works</a><a href="blog">Blog</a><a href="?p=shop">Shop</a><a href="about">About</a><a href="contact">Contact</a>
+      <a href="#courses">Courses</a><?php if ($teachers): ?><a href="#teachers">Teachers</a><?php endif ?><a href="#why">Why us</a><a href="#how">How it works</a><a href="blog">Blog</a><a href="shop">Shop</a><a href="about">About</a><a href="contact">Contact</a>
       <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a>
       <?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>"><?= $canReg ? 'Enroll now' : 'Log in' ?></a><?php endif ?>
     </nav>
-    <div class="nav-cta"><?php if ($me): ?><a class="btn" href="?p=home">My dashboard →</a><?php else: ?><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?><?php endif ?></div>
+    <div class="nav-cta"><a class="cartbtn" href="cart" aria-label="Cart">🛒<?php $cc = cart_count(); if ($cc): ?><i><?= $cc ?></i><?php endif ?></a><?php if ($me): ?><a class="btn" href="?p=home">My dashboard →</a><?php else: ?><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?><?php endif ?></div>
     <button class="burger" aria-label="Menu" onclick="document.body.classList.toggle('open')"><span></span><span></span><span></span></button>
   </div>
 </header>
@@ -109,6 +109,13 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 </section>
 <?php endif ?>
 
+<?php $sp = all('SELECT * FROM products WHERE active=1 AND (stock IS NULL OR stock>0) ORDER BY id DESC LIMIT 8'); if ($sp): ?>
+<section id="shop" class="sec alt"><div class="container">
+  <div class="sec-head"><span class="kicker">Shop</span><h2>Task books &amp; learning material</h2><p>Order online — cash on delivery all over Pakistan.</p></div>
+  <div class="sgrid"><?php foreach ($sp as $p) require __DIR__ . '/_store_card.php'; ?></div>
+  <div class="center" style="margin-top:24px"><a class="btn lg" href="shop">Visit the shop →</a></div>
+</div></section>
+<?php endif ?>
 <section id="why" class="sec">
   <div class="container">
     <div class="sec-head"><span class="kicker">Why choose us</span><h2>Learning that fits your life</h2></div>

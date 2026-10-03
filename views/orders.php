@@ -3,7 +3,7 @@ $me = user(); $title = role('admin') ? 'Shop orders' : 'My orders'; $back = role
 $f = isset(ORDER_ST[get('f')]) ? get('f') : (role('admin') && get('f') !== 'all' ? 'open' : '');
 if (role('admin')) {
     $w = $f === 'open' ? 'o.status IN ("pending","paid","processing","shipped")' : ($f ? 'o.status="' . $f . '"' : '1=1');
-    $rows = all("SELECT o.*,u.name,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) n FROM orders o JOIN users u ON u.id=o.user_id WHERE $w ORDER BY o.id DESC LIMIT 200");
+    $rows = all("SELECT o.*,COALESCE(u.name,o.name) name,(o.user_id IS NULL) guest,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) n FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE $w ORDER BY o.id DESC LIMIT 200");
     $st = one('SELECT SUM(status="pending") p, SUM(status IN ("paid","processing")) t, COALESCE(SUM(CASE WHEN status<>"cancelled" AND DATE_FORMAT(created_at,"%Y-%m")=DATE_FORMAT(CURDATE(),"%Y-%m") THEN total END),0) m FROM orders');
 } else $rows = all('SELECT o.*,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) n FROM orders o WHERE o.user_id=? ORDER BY o.id DESC', [$me['id']]);
 ?>

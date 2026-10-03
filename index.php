@@ -23,6 +23,30 @@ if ($isPost) {
             q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,"student")', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT)]);
             $_SESSION['uid'] = db()->lastInsertId(); redirect('./');
     }
+    if (in_array($a, ['store_add', 'store_update', 'store_checkout'], true)) {
+        if ($a === 'store_add') {
+            $pr = one('SELECT * FROM products WHERE id=? AND active=1', [$id]); if (!$pr) redirect('shop');
+            $cur = (int)($_SESSION['cart'][$id] ?? 0); $new = $pr['type'] === 'digital' ? 1 : $cur + max(1, (int)post('qty', 1));
+            if ($pr['stock'] !== null && $new > (int)$pr['stock']) { flash('Only ' . (int)$pr['stock'] . ' in stock', 'err'); redirect(product_url($pr)); }
+            $_SESSION['cart'][$id] = $new;
+            if (post('buy_now')) redirect('checkout');
+            flash('Added to cart'); redirect(post('back') ?: 'cart');
+        }
+        if ($a === 'store_update') { foreach ((array)($_POST['qty'] ?? []) as $pid => $q) { $q = (int)$q; if ($q <= 0) unset($_SESSION['cart'][(int)$pid]); else $_SESSION['cart'][(int)$pid] = min($q, 99); } redirect('cart'); }
+        $_SESSION['co'] = array_intersect_key($_POST, array_flip(['name', 'phone', 'email', 'address', 'city', 'note', 'pay_method']));
+        try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('checkout'); }
+        $r = place_order(['proof' => $proof] + $_POST);
+        if (is_string($r)) { flash($r, 'err'); redirect('checkout'); }
+        unset($_SESSION['co']);
+        $o = one('SELECT * FROM orders WHERE id=?', [$r]); redirect(order_track_url($o) . '&new=1');
+    }
+    if ($a === 'track_proof') {
+        $o = one('SELECT * FROM orders WHERE id=?', [$id]);
+        if (!$o || !can_view_order($o) || $o['status'] !== 'pending') redirect('track');
+        try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect(order_track_url($o)); }
+        q('UPDATE orders SET proof=IF(?="",proof,?),txn_ref=?,pay_method=? WHERE id=?', [$proof, $proof, post('txn_ref'), in_array(post('pay_method'), ['JazzCash', 'EasyPaisa', 'Bank'], true) ? post('pay_method') : $o['pay_method'], $id]);
+        flash('Payment proof received — we will confirm shortly.'); redirect(order_track_url($o));
+    }
     if ($a === 'contact_send') {
         if (post('website') !== '' || (time() - ($_SESSION['last_contact'] ?? 0)) < 30) { flash('Please wait a moment before sending another message.', 'err'); redirect('contact'); }
         if (post('name') === '' || post('message') === '' || (post('email') === '' && post('phone') === '')) { flash('Please enter your name, message and an email or phone.', 'err'); redirect('contact'); }
@@ -484,25 +508,11 @@ if ($isPost) {
             foreach ((array)($_POST['qty'] ?? []) as $pid => $q) { $q = (int)$q; if ($q <= 0) unset($_SESSION['cart'][(int)$pid]); else $_SESSION['cart'][(int)$pid] = min($q, 99); }
             redirect('?p=cart');
         case 'checkout':
-            $items = cart_items(); if (!$items) redirect('?p=shop');
-            foreach ($items as $it) if ($it['stock'] !== null && $it['qty'] > (int)$it['stock']) { flash($it['title'] . ': only ' . (int)$it['stock'] . ' left', 'err'); redirect('?p=cart'); }
-            $phys = (bool)array_filter($items, fn($i) => $i['type'] === 'physical');
-            if ($phys && (post('address') === '' || post('city') === '' || post('phone') === '')) { flash('Please enter delivery address, city and phone', 'err'); redirect('?p=cart'); }
-            $pm = in_array(post('pay_method'), ['COD', 'JazzCash', 'EasyPaisa', 'Bank'], true) ? post('pay_method') : 'COD';
-            if ($pm === 'COD' && (!$phys || setting('shop_cod', '1') !== '1')) $pm = 'JazzCash';
             try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=cart'); }
-            $sub = array_sum(array_column($items, 'line')); $ship = shipping_for($sub, $phys);
-            $sid = role('parent') && is_parent_of((int)post('student_id')) ? (int)post('student_id') : (role('student') ? (int)$me['id'] : null);
-            q('INSERT INTO orders(user_id,student_id,subtotal,shipping,total,name,phone,address,city,pay_method,proof,txn_ref,note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', [$me['id'], $sid, $sub, $ship, $sub + $ship, post('name') ?: $me['name'], post('phone') ?: $me['phone'], post('address'), post('city'), $pm, $proof, post('txn_ref'), post('note')]);
-            $oid = (int)db()->lastInsertId();
-            foreach ($items as $it) {
-                q('INSERT INTO order_items(order_id,product_id,title,price,qty,type) VALUES(?,?,?,?,?,?)', [$oid, $it['id'], $it['title'], $it['price'], $it['qty'], $it['type']]);
-                if ($it['stock'] !== null) q('UPDATE products SET stock=GREATEST(0,stock-?) WHERE id=?', [$it['qty'], $it['id']]);
-            }
-            unset($_SESSION['cart']);
-            notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New shop order ' . order_no(['id' => $oid]), $me['name'] . ' · ' . money($sub + $ship) . ' · ' . $pm, "?p=order&id=$oid", '🛒');
-            flash('Order placed! ' . ($pm === 'COD' ? 'Pay cash on delivery.' : ($proof || post('txn_ref') ? 'We will confirm your payment shortly.' : 'Please upload your payment proof on the order page.')));
-            redirect("?p=order&id=$oid");
+            $r = place_order(['proof' => $proof, 'name' => post('name') ?: $me['name'], 'phone' => post('phone') ?: $me['phone'], 'email' => $me['email']] + $_POST);
+            if (is_string($r)) { flash($r, 'err'); redirect('?p=cart'); }
+            flash('Order placed! ' . (post('pay_method') === 'COD' ? 'Pay cash on delivery.' : ($proof || post('txn_ref') ? 'We will confirm your payment shortly.' : 'Please upload your payment proof on the order page.')));
+            redirect("?p=order&id=$r");
         case 'order_proof':
             $o = one('SELECT * FROM orders WHERE id=? AND user_id=? AND status="pending"', [$id, $me['id']]); if (!$o) redirect('?p=orders');
             try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=order&id=$id"); }
@@ -524,7 +534,7 @@ if ($isPost) {
                 if ($paidNow) { q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$o['student_id'] ?: $o['user_id'], null, $o['total'], $o['pay_method'] === 'COD' ? 'Cash' : $o['pay_method'], 'Shop ' . order_no($o), date('Y-m-d'), $me['id']]); q('UPDATE orders SET payment_id=? WHERE id=?', [(int)db()->lastInsertId(), $id]); }
                 if ($st === 'cancelled' && $o['status'] !== 'cancelled') foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
                 q('UPDATE orders SET status=?,tracking=?,admin_note=? WHERE id=?', [$st, post('tracking'), post('admin_note'), $id]);
-                if ($st !== $o['status']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], post('tracking') ? 'Tracking: ' . post('tracking') : (post('admin_note') ?: ''), "?p=order&id=$id", '📦');
+                if ($st !== $o['status'] && $o['user_id']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], post('tracking') ? 'Tracking: ' . post('tracking') : (post('admin_note') ?: ''), "?p=order&id=$id", '📦');
                 flash('Order updated');
             }
             redirect("?p=order&id=$id");
@@ -597,10 +607,10 @@ if ($p === 'sub_file') {
     header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
 }
 if ($p === 'dl' || $p === 'order_proof_file') {
-    require_login();
+    if ($p === 'order_proof_file') require_login();
     if ($p === 'dl') {
-        $it = one('SELECT oi.*,o.user_id,o.student_id,o.status,pr.file FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products pr ON pr.id=oi.product_id WHERE oi.id=?', [$id]);
-        $ok = $it && $it['file'] && in_array($it['status'], ['paid', 'processing', 'shipped', 'delivered'], true) && (role('admin') || (int)$it['user_id'] === (int)user()['id'] || (int)$it['student_id'] === (int)user()['id']);
+        $it = one('SELECT oi.*,o.user_id,o.student_id,o.status,o.token,pr.file FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products pr ON pr.id=oi.product_id WHERE oi.id=?', [$id]);
+        $ok = $it && $it['file'] && in_array($it['status'], ['paid', 'processing', 'shipped', 'delivered'], true) && can_view_order(one('SELECT * FROM orders WHERE id=?', [$it['order_id']]));
         $f = $ok ? $it['file'] : '';
     } else { $o = one('SELECT * FROM orders WHERE id=?', [$id]); $f = $o && (role('admin') || (int)$o['user_id'] === (int)user()['id']) ? $o['proof'] : ''; }
     $path = UPLOAD_DIR . '/' . basename((string)$f); if (!$f || !is_file($path)) { http_response_code(404); exit('Not available'); }
@@ -618,6 +628,7 @@ if ($p === 'proof_file') {
 }
 if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
+if (in_array($p, ['store', 'store_product', 'store_cart', 'store_checkout', 'track'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if ($p === 'robots') { header('Content-Type: text/plain'); echo "User-agent: *\nAllow: /\nDisallow: /install.php\nDisallow: /*?p=login\nDisallow: /*?p=register\n\nSitemap: " . abs_url('sitemap.xml') . "\n"; exit; }
 if ($p === 'adstxt') { header('Content-Type: text/plain'); $c = adsense_client(); echo $c ? 'google.com, ' . str_replace('ca-', '', $c) . ", DIRECT, f08c47fec0942fa0\n" : "# AdSense publisher ID not set yet\n"; exit; }
@@ -626,6 +637,8 @@ if ($p === 'sitemap') {
     $u = [[abs_url(), date('Y-m-d'), '1.0'], [abs_url('blog'), date('Y-m-d'), '0.9']];
     foreach (all('SELECT slug,updated_at,created_at FROM posts WHERE published=1 ORDER BY created_at DESC') as $r) $u[] = [abs_url('blog/' . $r['slug']), substr($r['updated_at'] ?: $r['created_at'], 0, 10), '0.8'];
     foreach (array_keys(LEGAL_PAGES) as $k) $u[] = [abs_url($k), date('Y-m-d'), '0.4'];
+    $u[] = [abs_url('shop'), date('Y-m-d'), '0.9'];
+    foreach (all('SELECT id,title FROM products WHERE active=1') as $r) $u[] = [abs_url(product_url($r)), date('Y-m-d'), '0.7'];
     foreach (all('SELECT u.id FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.active=1 AND tp.public=1') as $r) $u[] = [abs_url('?p=teacher&id=' . $r['id']), date('Y-m-d'), '0.6'];
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
     foreach ($u as [$l, $d, $pr]) echo '<url><loc>' . htmlspecialchars($l, ENT_XML1) . "</loc><lastmod>$d</lastmod><priority>$pr</priority></url>\n";

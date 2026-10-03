@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.3.0';
-const DB_VERSION = 12;
+const APP_VERSION = '2.4.0';
+const DB_VERSION = 13;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -99,6 +99,11 @@ function migrate() {
     foreach (['program' => "VARCHAR(20) NOT NULL DEFAULT 'course'", 'level' => "VARCHAR(60) DEFAULT ''"] as $col => $def)
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='courses' AND COLUMN_NAME=?", [$col]))
             db()->exec("ALTER TABLE courses ADD $col $def");
+    if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND COLUMN_NAME='user_id'") === 'NO')
+        db()->exec("ALTER TABLE orders MODIFY user_id INT NULL");
+    foreach (['email' => "VARCHAR(160) DEFAULT ''", 'token' => "VARCHAR(32) DEFAULT ''"] as $col => $def)
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND COLUMN_NAME=?", [$col]))
+            db()->exec("ALTER TABLE orders ADD $col $def");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -395,3 +400,36 @@ function shipping_for(float $sub, bool $physical): float {
 }
 function order_no(array $o): string { return 'ORD-' . str_pad((string)$o['id'], 5, '0', STR_PAD_LEFT); }
 function product_img(array $p): string { return $p['image'] ? photo_url($p['image']) : ''; }
+
+function product_url(array $p): string { return 'shop/' . $p['id'] . '-' . slugify($p['title']); }
+function order_track_url(array $o): string { return 'track?o=' . $o['id'] . '&t=' . $o['token']; }
+// Create an order from the session cart (guest or logged-in). Returns order id or error string.
+function place_order(array $f): int|string {
+    $items = cart_items(); if (!$items) return 'Your cart is empty';
+    foreach ($items as $it) if ($it['stock'] !== null && $it['qty'] > (int)$it['stock']) return $it['title'] . ': only ' . (int)$it['stock'] . ' left';
+    $phys = (bool)array_filter($items, fn($i) => $i['type'] === 'physical');
+    if (trim($f['name'] ?? '') === '' || trim($f['phone'] ?? '') === '') return 'Please enter your name and phone number';
+    if ($phys && (trim($f['address'] ?? '') === '' || trim($f['city'] ?? '') === '')) return 'Please enter your delivery address and city';
+    if (!$phys && trim($f['email'] ?? '') === '' && !user()) return 'Please enter your email for the download link';
+    $pm = in_array($f['pay_method'] ?? '', ['COD', 'JazzCash', 'EasyPaisa', 'Bank'], true) ? $f['pay_method'] : 'COD';
+    if ($pm === 'COD' && (!$phys || setting('shop_cod', '1') !== '1')) $pm = 'JazzCash';
+    $sub = array_sum(array_column($items, 'line')); $ship = shipping_for($sub, $phys);
+    $u = user(); $tok = bin2hex(random_bytes(12));
+    $sid = $u && $u['role'] === 'student' ? (int)$u['id'] : ($u && $u['role'] === 'parent' && !empty($f['student_id']) && is_parent_of((int)$f['student_id']) ? (int)$f['student_id'] : null);
+    q('INSERT INTO orders(user_id,student_id,subtotal,shipping,total,name,phone,email,address,city,pay_method,proof,txn_ref,note,token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [$u['id'] ?? null, $sid, $sub, $ship, $sub + $ship, mb_substr(trim($f['name']), 0, 120), mb_substr(trim($f['phone']), 0, 40), mb_substr(trim($f['email'] ?? ''), 0, 160), mb_substr(trim($f['address'] ?? ''), 0, 300), mb_substr(trim($f['city'] ?? ''), 0, 80), $pm, $f['proof'] ?? '', mb_substr($f['txn_ref'] ?? '', 0, 100), mb_substr($f['note'] ?? '', 0, 300), $tok]);
+    $oid = (int)db()->lastInsertId();
+    foreach ($items as $it) {
+        q('INSERT INTO order_items(order_id,product_id,title,price,qty,type) VALUES(?,?,?,?,?,?)', [$oid, $it['id'], $it['title'], $it['price'], $it['qty'], $it['type']]);
+        if ($it['stock'] !== null) q('UPDATE products SET stock=GREATEST(0,stock-?) WHERE id=?', [$it['qty'], $it['id']]);
+    }
+    unset($_SESSION['cart']);
+    $_SESSION['my_orders'][$oid] = $tok;
+    notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New shop order ' . order_no(['id' => $oid]), trim($f['name']) . ' · ' . money($sub + $ship) . ' · ' . $pm . ($u ? '' : ' · guest'), "?p=order&id=$oid", '🛒');
+    return $oid;
+}
+function can_view_order(array $o): bool {
+    $u = user();
+    if ($u && ($u['role'] === 'admin' || (int)$o['user_id'] === (int)$u['id'] || (int)$o['student_id'] === (int)$u['id'])) return true;
+    $t = (string)(get('t') ?: ($_SESSION['my_orders'][$o['id']] ?? ''));
+    return $o['token'] !== '' && hash_equals((string)$o['token'], $t);
+}

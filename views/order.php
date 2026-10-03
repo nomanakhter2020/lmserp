@@ -1,7 +1,7 @@
 <?php
 $me = user();
-$o = one('SELECT o.*,u.name uname,s.name sname FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN users s ON s.id=o.student_id WHERE o.id=?', [$id]);
-if (!$o || (!role('admin') && (int)$o['user_id'] !== (int)$me['id'] && (int)$o['student_id'] !== (int)$me['id'])) { echo '<p class="empty">Order not found</p>'; return; }
+$o = one('SELECT o.*,COALESCE(u.name,o.name) uname,s.name sname FROM orders o LEFT JOIN users u ON u.id=o.user_id LEFT JOIN users s ON s.id=o.student_id WHERE o.id=?', [$id]);
+if (!$o || !can_view_order($o)) { echo '<p class="empty">Order not found</p>'; return; }
 $title = order_no($o); $back = '?p=orders';
 $items = all('SELECT * FROM order_items WHERE order_id=?', [$id]);
 $paid = in_array($o['status'], ['paid', 'processing', 'shipped', 'delivered'], true);
