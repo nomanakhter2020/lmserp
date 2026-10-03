@@ -11,7 +11,7 @@ $cats = all('SELECT category,COUNT(*) n FROM posts WHERE published=1 GROUP BY ca
       <?php if ($phone): ?><p>📞 <?= e($phone) ?></p><?php endif ?><?php if ($email): ?><p>✉️ <?= e($email) ?></p><?php endif ?></div>
     <div><h4>Explore</h4><a href="./#courses">Courses</a><a href="./#teachers">Teachers</a><a href="blog">Blog</a><a href="?p=login">Student login</a></div>
     <div><h4>Blog topics</h4><?php foreach ($cats as $c): ?><a href="blog?cat=<?= e(rawurlencode($c['category'])) ?>"><?= e($c['category']) ?></a><?php endforeach; if (!$cats): ?><a href="blog">All articles</a><?php endif ?></div>
-    <div><h4>Company</h4><a href="about">About us</a><a href="contact">Contact us</a><a href="privacy-policy">Privacy policy</a><a href="terms">Terms &amp; conditions</a><a href="disclaimer">Disclaimer</a></div>
+    <div><h4>Company</h4><a href="about">About us</a><a href="contact">Contact us</a><a href="shop">Shop</a><a href="track">Track your order</a><a href="privacy-policy">Privacy policy</a><a href="terms">Terms &amp; conditions</a><a href="disclaimer">Disclaimer</a></div>
   </div>
   <div class="container foot-bottom"><small>© <?= date('Y') ?> <?= e($inst) ?>. All rights reserved.</small><small><a href="privacy-policy">Privacy</a> · <a href="terms">Terms</a> · <a href="sitemap.xml">Sitemap</a></small></div>
 </footer>

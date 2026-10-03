@@ -16,6 +16,8 @@ require __DIR__ . '/_site_head.php';
   <h1 class="pg-h">Track your order</h1>
   <?php if (!empty($notFound)): ?><div class="cv-note">We couldn't find an order with that number and phone. Please check and try again.</div><?php endif ?>
   <form class="cform" action="track"><label>Order number<input name="no" placeholder="e.g. ORD-00012" required value="<?= e(get('no')) ?>"></label><label>Phone used for the order<input name="phone" required inputmode="tel" value="<?= e(get('phone')) ?>"></label><button class="btn lg">Track order</button></form>
+  <?php $mine = !empty($_SESSION['my_orders']) ? all('SELECT * FROM orders WHERE id IN (' . implode(',', array_map('intval', array_keys($_SESSION['my_orders']))) . ') ORDER BY id DESC') : []; if ($mine): ?>
+  <h3 style="margin-top:28px">Your recent orders</h3><div class="cform"><?php foreach ($mine as $m): ?><a class="sumi" href="<?= e(order_track_url($m)) ?>"><span class="grow"><b><?= order_no($m) ?></b> <small class="muted"><?= date('d M Y', strtotime($m['created_at'])) ?></small></span><span><?= e(ORDER_ST[$m['status']][0] ?? $m['status']) ?></span><b><?= money($m['total']) ?></b></a><?php endforeach ?></div><?php endif ?>
 <?php else:
   $items = all('SELECT * FROM order_items WHERE order_id=?', [$o['id']]);
   $paid = in_array($o['status'], ['paid', 'processing', 'shipped', 'delivered'], true);
