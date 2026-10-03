@@ -42,3 +42,9 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
 <form method="post" class="card" onsubmit="return confirm('Add demo teachers and IT courses?')"><?= csrf_field() ?><input type="hidden" name="a" value="demo_seed">
   <p class="muted">Adds 10 sample teachers (Maths, English/IELTS, IT, Physics, Chemistry, Biology, Urdu, Accounting, Quran, Kids) with full CV profiles and photos, plus 5 IT courses (Web Development, Python, MS Office, Graphic Design, Digital Marketing) with cover images, lectures, videos and quizzes. Safe to run again — nothing is duplicated.</p>
   <button class="btn block ghost">👩‍🏫 Load demo teachers & IT courses</button></form>
+<form method="post" class="card" onsubmit="return confirm('Add demo shop products and orders?')"><?= csrf_field() ?><input type="hidden" name="a" value="shop_seed">
+  <p class="muted">Adds 10 shop products (task books, kits, PDFs — with photos), 5 demo families (parent + child) and 10 orders in different statuses. Demo orders are not counted as income.</p>
+  <button class="btn block ghost">🛒 Load demo products & orders</button></form>
+<form method="post" class="card" onsubmit="return confirm('Remove all demo shop products, orders and demo families?')"><?= csrf_field() ?><input type="hidden" name="a" value="shop_clear">
+  <p class="muted">Removes the demo shop data above (demo teachers and courses are not touched).</p>
+  <button class="btn block danger">🧹 Remove demo shop data</button></form>

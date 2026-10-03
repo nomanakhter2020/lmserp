@@ -528,6 +528,13 @@ if ($isPost) {
                 flash('Order updated');
             }
             redirect("?p=order&id=$id");
+        case 'shop_seed':
+            require_role('admin'); @set_time_limit(300); require __DIR__ . '/inc/shop_seed.php';
+            [$np, $no, $ni] = shop_seed(); $errs = array_unique($GLOBALS['demo_err'] ?? []);
+            flash("Demo shop loaded: $np new products ($ni with photos), $no orders." . ($errs ? ' Image problem: ' . implode('; ', $errs) : ''), $errs ? 'warn' : 'ok'); redirect('?p=orders&f=all');
+        case 'shop_clear':
+            require_role('admin'); require __DIR__ . '/inc/shop_seed.php';
+            [$p, $o, $u] = shop_demo_clear(); flash("Removed $p demo products, $o demo orders and $u demo students/parents"); redirect('?p=settings#demo');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
