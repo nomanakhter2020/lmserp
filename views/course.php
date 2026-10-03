@@ -2,10 +2,11 @@
 $me = user();
 $c = one('SELECT c.*,u.name tname,cat.name cname FROM courses c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN categories cat ON cat.id=c.category_id WHERE c.id=?', [$id]);
 if (!$c || (!$c['published'] && !can_manage_course($c) && !role('admin'))) { echo '<p class="empty">Course not found</p>'; return; }
-$title = $c['title']; $back = role('student') ? '?p=my' : '?p=courses';
+$title = $c['title']; $back = '?p=courses';
 $manage = can_manage_course($c);
 $en = one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]);
 $access = $manage || ($en && $en['status'] !== 'pending');
+if ($en && !$manage) $back = '?p=my';
 $lessons = all('SELECT l.*,(SELECT 1 FROM progress p WHERE p.lesson_id=l.id AND p.user_id=?) done FROM lessons l WHERE course_id=? ORDER BY sort,id', [$me['id'], $id]);
 $quizzes = all('SELECT qz.*,(SELECT COUNT(*) FROM questions q WHERE q.quiz_id=qz.id) qn,(SELECT MAX(ROUND(score*100/NULLIF(total,0))) FROM attempts a WHERE a.quiz_id=qz.id AND a.user_id=?) best FROM quizzes qz WHERE course_id=?', [$me['id'], $id]);
 $ann = all('SELECT * FROM announcements WHERE course_id=? ORDER BY id DESC LIMIT 5', [$id]);
@@ -20,10 +21,11 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
 <?php if ($c['cover']): ?><img class="cover-img" src="<?= e(cover_url($c)) ?>" alt=""><?php endif ?>
 <?php if ($c['description']): ?><p class="desc"><?= nl2br(e($c['description'])) ?></p><?php endif ?>
 
-<?php if (role('student')): ?>
+<?php $myFee = course_fee_for($c); if (can_enroll($c) && !$manage): ?>
+  <?php if (role('teacher') && $myFee < (float)$c['fee']): ?><div class="alert">👩‍🏫 Teacher price: <b><?= money($myFee) ?></b> <s><?= money($c['fee']) ?></s></div><?php endif ?>
   <?php if (!$en): ?>
     <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="enroll"><input type="hidden" name="id" value="<?= $id ?>">
-      <button class="btn block" formaction="?id=<?= $id ?>"><?= (float)$c['fee'] > 0 ? 'Enroll · ' . money($c['fee']) : 'Enroll for free' ?></button></form>
+      <button class="btn block" formaction="?id=<?= $id ?>"><?= $myFee > 0 ? 'Enroll · ' . money($myFee) : 'Enroll for free' ?></button></form>
   <?php elseif ($en['status'] === 'pending'):
     $reqs = all('SELECT * FROM payment_requests WHERE user_id=? AND course_id=? ORDER BY id DESC', [$me['id'], $id]);
     $waiting = $reqs && $reqs[0]['status'] === 'pending';
@@ -34,13 +36,13 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
     <?php else: ?>
       <?php if ($reqs && $reqs[0]['status'] === 'rejected'): ?><div class="alert err">Your last payment proof was not accepted<?= $reqs[0]['admin_note'] ? ': ' . e($reqs[0]['admin_note']) : '' ?>. Please submit again.</div><?php endif ?>
       <div class="card paybox">
-        <h3>💳 Pay <?= money($c['fee']) ?> to unlock</h3>
+        <h3>💳 Pay <?= money($myFee) ?> to unlock</h3>
         <?php foreach ($accts as $m => $txt): ?><div class="acct"><b><?= $m ?></b><span><?= nl2br(e($txt)) ?></span></div><?php endforeach ?>
         <?php if (setting('pay_cash')): ?><div class="acct"><b>Cash</b><span><?= nl2br(e(setting('pay_cash'))) ?></span></div><?php endif ?>
         <form method="post" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="a" value="proof_submit"><input type="hidden" name="id" value="<?= $id ?>">
           <label>How did you pay?<select name="method" id="pm" onchange="document.getElementById('online').hidden=this.value==='Cash'">
             <?php foreach (array_keys($accts) ?: ['Bank', 'JazzCash', 'EasyPaisa'] as $m): ?><option><?= $m ?></option><?php endforeach ?><option value="Cash">Cash at office</option></select></label>
-          <label>Amount (PKR)<input name="amount" type="number" min="1" value="<?= (float)$c['fee'] ?>" required></label>
+          <label>Amount (PKR)<input name="amount" type="number" min="1" value="<?= $myFee ?>" required></label>
           <div id="online">
             <label>Payment screenshot<input name="proof" type="file" accept="image/*,application/pdf"></label>
             <label>Transaction ID <small>(optional if screenshot attached)</small><input name="txn_ref" placeholder="e.g. 0123456789"></label>

@@ -4,12 +4,12 @@ $u = one('SELECT * FROM users WHERE id=?', [$id]);
 if (!$u) { echo '<p class="empty">Not found</p>'; return; }
 $title = $u['name']; $back = '?p=users&role=' . $u['role'];
 $me = user();
-$ens = all('SELECT e.*,c.title,c.fee,c.teacher_id FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ' . (role('teacher') ? 'AND c.teacher_id=' . (int)$me['id'] : '') . ' ORDER BY e.id DESC', [$id]);
+$ens = all('SELECT e.*,c.title,COALESCE(e.fee,c.fee) fee,c.teacher_id FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ' . (role('teacher') ? 'AND c.teacher_id=' . (int)$me['id'] : '') . ' ORDER BY e.id DESC', [$id]);
 $pays = role('admin') ? all('SELECT p.*,c.title FROM payments p LEFT JOIN courses c ON c.id=p.course_id WHERE p.user_id=? ORDER BY p.paid_on DESC', [$id]) : [];
 $paid = array_sum(array_column($pays, 'amount'));
 $due = array_sum(array_map(fn($e) => (float)$e['fee'], $ens)) - $paid;
 $atts = all('SELECT a.*,qz.title FROM attempts a JOIN quizzes qz ON qz.id=a.quiz_id WHERE a.user_id=? ORDER BY a.id DESC LIMIT 10', [$id]);
-$courses = role('admin') ? all('SELECT id,title,fee FROM courses ORDER BY title') : [];
+$courses = role('admin') ? all('SELECT id,title,fee FROM courses' . ($u['role'] === 'teacher' ? ' WHERE teacher_id IS NULL OR teacher_id<>' . (int)$u['id'] : '') . ' ORDER BY title') : [];
 $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa = '92' . substr($wa, 1);
 ?>
 <div class="card profile">
@@ -21,11 +21,11 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
   <?php if (role('admin')): ?><a href="?p=user_edit&id=<?= $id ?>">✏️ Edit</a><?php endif ?>
   <?php if (role('admin') && $u['role'] !== 'student'): ?><a href="?p=tprofile&id=<?= $id ?>">🪪 CV profile</a><a href="?p=teacher&id=<?= $id ?>" target="_blank">🌐 View CV</a><?php endif ?>
 </div>
-<?php if (role('admin') && $u['role'] === 'student'): ?>
+<?php if (role('admin') && $u['role'] !== 'admin'): ?>
 <div class="stats"><div class="stat"><b><?= money($paid) ?></b><span>Paid</span></div><div class="stat"><b class="<?= $due > 0 ? 'neg' : '' ?>"><?= money(max(0, $due)) ?></b><span>Balance due</span></div></div>
 <?php endif ?>
 
-<h2>Courses</h2>
+<h2><?= $u['role'] === 'teacher' ? 'Enrolled as learner' : 'Courses' ?></h2>
 <div class="list"><?php foreach ($ens as $e): $pc = course_progress($id, (int)$e['course_id']); ?>
   <div class="row col"><div class="rowhead"><a href="?p=course&id=<?= $e['course_id'] ?>"><b><?= e($e['title']) ?></b></a><span class="pill <?= $e['status'] === 'pending' ? 'warn' : ($e['status'] === 'completed' ? 'ok' : '') ?>"><?= ucfirst($e['status']) ?></span></div>
   <div class="bar"><i style="width:<?= $pc ?>%"></i></div><small><?= $pc ?>% · fee <?= money($e['fee']) ?></small>
@@ -34,7 +34,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
   <?php endif ?></div>
 <?php endforeach; if (!$ens): ?><p class="empty">Not enrolled</p><?php endif ?></div>
 
-<?php if (role('admin') && $u['role'] === 'student'): ?>
+<?php if (role('admin') && $u['role'] !== 'admin'): ?>
 <details class="card"><summary>＋ Enroll in a course</summary>
 <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="enroll_admin"><input type="hidden" name="user_id" value="<?= $id ?>"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>">
   <select name="course_id"><?php foreach ($courses as $c): ?><option value="<?= $c['id'] ?>"><?= e($c['title']) ?> (<?= money($c['fee']) ?>)</option><?php endforeach ?></select>

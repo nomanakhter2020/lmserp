@@ -19,6 +19,7 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
   <label>JazzCash<input name="pay_jazzcash" value="<?= e(setting('pay_jazzcash')) ?>" placeholder="0300-1234567 · Account title"></label>
   <label>EasyPaisa<input name="pay_easypaisa" value="<?= e(setting('pay_easypaisa')) ?>" placeholder="0345-1234567 · Account title"></label>
   <label>Cash instructions<input name="pay_cash" value="<?= e(setting('pay_cash')) ?>" placeholder="Pay at office, Mon–Sat 10am–6pm"></label>
+  <label>Teacher discount on courses (%) <small>(0 = full price, 100 = free)</small><input name="teacher_discount" type="number" min="0" max="100" value="<?= (int)setting('teacher_discount', '0') ?>"></label>
   <input type="hidden" name="allow_register" value="0"><label class="check"><input type="checkbox" name="allow_register" value="1" <?= setting('allow_register', '1') === '1' ? 'checked' : '' ?>> Students can sign up themselves</label>
   <input type="hidden" name="paid_needs_approval" value="0"><label class="check"><input type="checkbox" name="paid_needs_approval" value="1" <?= setting('paid_needs_approval', '1') === '1' ? 'checked' : '' ?>> Paid courses need fee approval before access</label>
   <button class="btn block">Save settings</button></form>

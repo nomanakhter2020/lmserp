@@ -69,9 +69,10 @@ if ($isPost) {
             if (course_progress((int)$me['id'], (int)$l['course_id']) >= 100) q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$me['id'], $l['course_id']]);
             redirect($next ? "?p=lesson&id=$next" : "?p=course&id={$l['course_id']}");
         case 'enroll':
-            $c = one('SELECT * FROM courses WHERE id=? AND published=1', [$id]); if (!$c) redirect('?p=courses');
-            $status = ((float)$c['fee'] > 0 && setting('paid_needs_approval', '1') === '1') ? 'pending' : 'active';
-            q('INSERT IGNORE INTO enrollments(user_id,course_id,status) VALUES(?,?,?)', [$me['id'], $id, $status]);
+            $c = one('SELECT * FROM courses WHERE id=? AND published=1', [$id]); if (!$c || !can_enroll($c)) redirect('?p=courses');
+            $fee = course_fee_for($c);
+            $status = ($fee > 0 && setting('paid_needs_approval', '1') === '1') ? 'pending' : 'active';
+            q('INSERT IGNORE INTO enrollments(user_id,course_id,status,fee) VALUES(?,?,?,?)', [$me['id'], $id, $status, $fee]);
             flash($status === 'pending' ? 'Enrollment requested. Access opens after fee is confirmed.' : 'Enrolled!'); redirect("?p=course&id=$id");
         case 'enroll_admin':
             require_role('admin');
@@ -124,7 +125,7 @@ if ($isPost) {
             $method = in_array(post('method'), ['Bank', 'JazzCash', 'EasyPaisa', 'Cash'], true) ? post('method') : 'Bank';
             try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=course&id=$id"); }
             if ($method !== 'Cash' && !$proof && post('txn_ref') === '') { flash('Upload a screenshot or enter the transaction ID', 'err'); redirect("?p=course&id=$id"); }
-            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note) VALUES(?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', $c['fee']), $method, post('txn_ref'), $proof, post('note')]);
+            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note) VALUES(?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', course_fee_for($c)), $method, post('txn_ref'), $proof, post('note')]);
             flash($method === 'Cash' ? 'Noted. Pay cash at the office; admin will unlock the course.' : 'Payment proof sent. You will get access once the admin verifies it.');
             redirect("?p=course&id=$id");
         case 'proof_review':
@@ -233,7 +234,7 @@ if ($isPost) {
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
             $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];

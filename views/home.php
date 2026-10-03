@@ -48,7 +48,13 @@ if (role('admin')):
 <div class="quick"><a href="?p=course_edit">＋ New course</a><a href="?p=post_edit">✍️ Write article</a><a href="?p=announcements">📣 Announce</a></div>
 <?php if ((int)$myp['rej']): ?><a class="alert err" href="?p=posts" style="display:block">↩️ <?= (int)$myp['rej'] ?> article<?= $myp['rej'] > 1 ? 's' : '' ?> need changes — see admin notes ›</a>
 <?php elseif (!$myp['last'] || strtotime($myp['last']) < strtotime('-7 days')): ?><a class="alert" href="?p=post_edit" style="display:block">✍️ Share your knowledge — write a blog article this week. It helps students find your courses on Google. ›</a><?php endif ?>
-<h2>My courses</h2>
+<?php $learn = all('SELECT c.*,e.status FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ORDER BY e.id DESC LIMIT 4', [$me['id']]); if ($learn): ?>
+<div class="rowhead sec-t"><h2>My learning</h2><a href="?p=my">See all ›</a></div>
+<div class="list"><?php foreach ($learn as $l): $pc = course_progress((int)$me['id'], (int)$l['id']); ?>
+  <a class="row col" href="?p=course&id=<?= $l['id'] ?>"><div class="rowhead"><b><?= e($l['title']) ?></b><?php if ($l['status'] === 'pending'): ?><span class="pill warn">Pending</span><?php endif ?></div><div class="bar"><i style="width:<?= $pc ?>%"></i></div><small><?= $pc ?>% complete</small></a>
+<?php endforeach ?></div>
+<?php endif ?>
+<h2>My courses (teaching)</h2>
 <div class="grid"><?php foreach ($cs as $c): ?>
   <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>"><div class="band<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"></div><b><?= e($c['title']) ?></b><small><?= $c['ls'] ?> lessons · <?= $c['st'] ?> students</small></a>
 <?php endforeach; if (!$cs): ?><p class="empty">No courses yet. Create your first one.</p><?php endif ?></div>

@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.8.0';
-const DB_VERSION = 7;
+const APP_VERSION = '1.9.0';
+const DB_VERSION = 8;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -88,6 +88,8 @@ function migrate() {
     foreach (['review' => "VARCHAR(10) NOT NULL DEFAULT ''", 'review_note' => "VARCHAR(255) DEFAULT ''"] as $col => $def)
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='posts' AND COLUMN_NAME=?", [$col]))
             db()->exec("ALTER TABLE posts ADD $col $def");
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='enrollments' AND COLUMN_NAME='fee'"))
+        db()->exec("ALTER TABLE enrollments ADD fee DECIMAL(12,2) NULL");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -222,3 +224,11 @@ function legal_default(string $slug): string {
     return '';
 }
 function legal_content(string $slug): string { $c = trim(setting('page_' . $slug)); return $c !== '' ? $c : legal_default($slug); }
+
+// Fee a given user pays for a course (teachers get the configured discount)
+function course_fee_for(array $c, ?array $u = null): float {
+    $u = $u ?? user(); $fee = (float)$c['fee'];
+    if ($u && $u['role'] === 'teacher') $fee = round($fee * (100 - max(0, min(100, (int)setting('teacher_discount', '0')))) / 100);
+    return $fee;
+}
+function can_enroll(array $c): bool { return role('student') || (role('teacher') && (int)$c['teacher_id'] !== (int)user()['id']); }

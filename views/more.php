@@ -7,7 +7,7 @@ $items = [
   ['messages', '📬', 'Contact messages' . (role('admin') && ($m = (int)val('SELECT COUNT(*) FROM contact_messages WHERE is_read=0')) ? " ($m)" : ''), role('admin')],
   ['pages_edit', '📄', 'Website pages', role('admin')],
   ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
-  ['fees', '💳', 'My fees', role('student')],
+  ['fees', '💳', 'My fees', role('student', 'teacher')],
   ['enrollments', '📝', 'Enrollments', role('admin', 'teacher')],
   ['expenses', '📉', 'Expenses', role('admin')],
   ['reports', '📊', 'Reports', role('admin')],

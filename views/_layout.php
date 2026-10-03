@@ -18,10 +18,11 @@ function ico($k) { global $icons; return '<svg viewBox="0 0 24 24" fill="none" s
 $nav = !$u ? [] : ($u['role'] === 'admin'
     ? ['home' => 'Home', 'courses' => 'Courses', 'users' => 'People', 'fees' => 'Fees', 'more' => 'More']
     : ($u['role'] === 'teacher'
-        ? ['home' => 'Home', 'courses' => 'Courses', 'users' => 'Students', 'more' => 'More']
+        ? ['home' => 'Home', 'courses' => 'Courses', 'my' => 'My Learning', 'users' => 'Students', 'more' => 'More']
         : ['home' => 'Home', 'my' => 'My Courses', 'courses' => 'Browse', 'more' => 'More']));
 $active = ['course' => 'courses', 'course_edit' => 'courses', 'lesson' => 'courses', 'lesson_edit' => 'courses', 'quiz' => 'courses', 'quiz_edit' => 'courses', 'user' => 'users', 'user_edit' => 'users', 'enrollments' => 'users', 'expenses' => 'more', 'recurring' => 'more', 'expense_cats' => 'more', 'proofs' => 'fees', 'posts' => 'more', 'post_edit' => 'more', 'messages' => 'more', 'pages_edit' => 'more', 'teachers' => 'more', 'tprofile' => 'more', 'reports' => 'more', 'settings' => 'more', 'profile' => 'more', 'announcements' => 'more'][$page] ?? $page;
-if ($u && $u['role'] === 'student' && in_array($page, ['course', 'lesson', 'quiz', 'quiz_result'])) $active = 'my';
+if ($u && in_array($u['role'], ['student', 'teacher'], true) && in_array($page, ['lesson', 'quiz', 'quiz_result'])) { $lc = $page === 'lesson' ? val('SELECT course_id FROM lessons WHERE id=?', [(int)get('id')]) : val('SELECT course_id FROM quizzes WHERE id=?', [(int)get('id')]); if ($u['role'] === 'student' || ($lc && !val('SELECT 1 FROM courses WHERE id=? AND teacher_id=?', [$lc, $u['id']]))) $active = 'my'; }
+if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

@@ -1,5 +1,5 @@
 <?php
-$me = user(); $title = 'My courses';
+$me = user(); $title = role('teacher') ? 'My learning' : 'My courses';
 $cs = all('SELECT c.*,e.status FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ORDER BY e.id DESC', [$me['id']]);
 ?>
 <div class="list">
@@ -11,4 +11,4 @@ $cs = all('SELECT c.*,e.status FROM enrollments e JOIN courses c ON c.id=e.cours
   </a>
 <?php endforeach ?>
 </div>
-<?php if (!$cs): ?><p class="empty">You haven't joined a course yet.<br><a class="btn" href="?p=courses">Browse courses</a></p><?php endif ?>
+<?php if (!$cs): ?><p class="empty">You haven't joined a course yet.<br><a class="btn" href="?p=courses">Browse courses</a><?php if (role('teacher') && ($d = (int)setting('teacher_discount', '0'))): ?><br><small>Teachers get <?= $d ?>% off every course.</small><?php endif ?></p><?php endif ?>
