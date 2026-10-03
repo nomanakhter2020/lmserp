@@ -1,7 +1,7 @@
 <?php
 // Public certificate view & verification
 $code = strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string)get('c')));
-$cert = $code ? one('SELECT ce.*,u.name,c.title,t.name tname FROM certificates ce JOIN users u ON u.id=ce.user_id JOIN courses c ON c.id=ce.course_id LEFT JOIN users t ON t.id=c.teacher_id WHERE ce.code=?', [$code]) : null;
+$cert = $code ? one('SELECT ce.*,u.name,c.title,c.program,t.name tname FROM certificates ce JOIN users u ON u.id=ce.user_id JOIN courses c ON c.id=ce.course_id LEFT JOIN users t ON t.id=c.teacher_id WHERE ce.code=?', [$code]) : null;
 $inst = setting('institute', APP_NAME);
 $verify = abs_url('?p=cert&c=' . $code);
 $signer = setting('cert_signer') ?: 'Director'; $stitle = setting('cert_signer_title') ?: $inst;
@@ -24,10 +24,10 @@ $signer = setting('cert_signer') ?: 'Director'; $stitle = setting('cert_signer_t
   <div class="sheet-wrap"><div class="cert <?= $cert['revoked'] ? 'revoked' : '' ?>">
     <div class="frame">
       <div class="top"><img src="assets/icon.svg" alt=""><div class="inst"><?= e($inst) ?></div></div>
-      <div class="kicker">Certificate of Completion</div>
+      <div class="kicker"><?= ($cert['program'] ?? '') === 'trainer' ? 'Certified Trainer' : 'Certificate of Completion' ?></div>
       <p class="pre">This is to certify that</p>
       <div class="name"><?= e($cert['name']) ?></div>
-      <p class="pre">has successfully completed the course</p>
+      <p class="pre"><?= ($cert['program'] ?? '') === 'trainer' ? 'has successfully completed the Train the Trainer program' : 'has successfully completed the course' ?></p>
       <div class="course"><?= e($cert['title']) ?></div>
       <?php if ($cert['grade']): ?><div class="grade">with <b><?= e($cert['grade']) ?></b></div><?php endif ?>
       <div class="foot">

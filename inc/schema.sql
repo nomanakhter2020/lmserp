@@ -383,3 +383,56 @@ CREATE TABLE IF NOT EXISTS parent_links (
   PRIMARY KEY (parent_id, student_id),
   INDEX(student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  description TEXT,
+  category VARCHAR(80) DEFAULT 'Books',
+  price DECIMAL(12,2) NOT NULL DEFAULT 0,
+  compare_price DECIMAL(12,2) NULL,
+  image VARCHAR(120) DEFAULT '',
+  type ENUM('physical','digital') NOT NULL DEFAULT 'physical',
+  file VARCHAR(120) DEFAULT '',
+  stock INT NULL,
+  course_id INT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(course_id), INDEX(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  student_id INT NULL,
+  status ENUM('pending','paid','processing','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
+  subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+  shipping DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total DECIMAL(12,2) NOT NULL DEFAULT 0,
+  name VARCHAR(120) DEFAULT '',
+  phone VARCHAR(40) DEFAULT '',
+  address VARCHAR(300) DEFAULT '',
+  city VARCHAR(80) DEFAULT '',
+  pay_method VARCHAR(30) DEFAULT 'COD',
+  proof VARCHAR(120) DEFAULT '',
+  txn_ref VARCHAR(100) DEFAULT '',
+  tracking VARCHAR(120) DEFAULT '',
+  note VARCHAR(300) DEFAULT '',
+  admin_note VARCHAR(300) DEFAULT '',
+  payment_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX(user_id), INDEX(status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  price DECIMAL(12,2) NOT NULL,
+  qty INT NOT NULL DEFAULT 1,
+  type VARCHAR(10) DEFAULT 'physical',
+  INDEX(order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

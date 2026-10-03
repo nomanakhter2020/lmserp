@@ -37,11 +37,13 @@ if ($isPost) {
             require_role('admin', 'teacher');
             $teacher = role('admin') ? ((int)post('teacher_id') ?: null) : $me['id'];
             $data = [post('title'), post('description'), (int)post('category_id') ?: null, $teacher, (float)post('fee'), post('color', '#4f46e5'), post('published') ? 1 : 0];
+            $prog = isset(PROGRAMS[post('program')]) ? post('program') : 'course'; $lvl = post('level');
             try { $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=course_edit' . ($id ? "&id=$id" : '')); }
             if ($id) {
                 $c = one('SELECT * FROM courses WHERE id=?', [$id]); if (!$c || !can_manage_course($c)) exit('Not allowed');
                 q('UPDATE courses SET title=?,description=?,category_id=?,teacher_id=?,fee=?,color=?,published=? WHERE id=?', [...$data, $id]);
             } else { q('INSERT INTO courses(title,description,category_id,teacher_id,fee,color,published) VALUES(?,?,?,?,?,?,?)', $data); $id = db()->lastInsertId(); }
+            q('UPDATE courses SET program=?,level=? WHERE id=?', [$prog, $lvl, $id]);
             if ($cover || post('remove_cover')) {
                 $old = val('SELECT cover FROM courses WHERE id=?', [$id]);
                 if ($old) @unlink(UPLOAD_DIR . '/covers/' . basename($old));
@@ -447,13 +449,92 @@ if ($isPost) {
             q('UPDATE notifications SET is_read=1 WHERE user_id=?', [$me['id']]); redirect('?p=notifications');
         case 'notif_clear':
             q('DELETE FROM notifications WHERE user_id=? AND is_read=1', [$me['id']]); redirect('?p=notifications');
+        case 'enroll_child':
+            require_role('parent');
+            $kid = (int)post('child_id'); $c = one('SELECT * FROM courses WHERE id=? AND published=1', [$id]);
+            if (!$c || !is_parent_of($kid)) redirect('?p=courses');
+            $st = enroll_child($kid, $c); $kn = val('SELECT name FROM users WHERE id=?', [$kid]);
+            if ($st === 'already') flash("$kn is already enrolled in this course", 'err');
+            elseif ($st === 'pending') { flash("$kn enrolled. A fee voucher has been created — pay it to unlock the course."); redirect('?p=fees&child=' . $kid); }
+            else flash("$kn enrolled!");
+            redirect("?p=course&id=$id");
+        case 'promote_trainer':
+            require_role('admin'); q('UPDATE users SET role="teacher" WHERE id=? AND role="student"', [$id]);
+            notify($id, 'Welcome to the teaching team! 🎉', 'You can now create courses and teach students.', '?p=home', '🎤');
+            flash('Promoted to teacher'); redirect("?p=user&id=$id");
+        case 'product_save':
+            require_role('admin');
+            try { $img = save_cover('image'); $file = post('type') === 'digital' ? save_upload('file') : ''; } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=product_edit' . ($id ? "&id=$id" : '')); }
+            $data = [post('title'), post('description'), post('category') ?: 'Books', (float)post('price'), post('compare_price') !== '' ? (float)post('compare_price') : null, post('type') === 'digital' ? 'digital' : 'physical', post('stock') !== '' ? (int)post('stock') : null, (int)post('course_id') ?: null, post('active') ? 1 : 0];
+            if ($id) q('UPDATE products SET title=?,description=?,category=?,price=?,compare_price=?,type=?,stock=?,course_id=?,active=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO products(title,description,category,price,compare_price,type,stock,course_id,active) VALUES(?,?,?,?,?,?,?,?,?)', $data); $id = (int)db()->lastInsertId(); }
+            if ($img) q('UPDATE products SET image=? WHERE id=?', [$img, $id]);
+            if ($file) q('UPDATE products SET file=? WHERE id=?', [$file, $id]);
+            flash('Product saved'); redirect("?p=product_edit&id=$id");
+        case 'product_delete':
+            require_role('admin'); q('UPDATE products SET active=0 WHERE id=?', [$id]); flash('Product hidden from shop'); redirect('?p=products');
+        case 'cart_add':
+            $pr = one('SELECT * FROM products WHERE id=? AND active=1', [$id]); if (!$pr) redirect('?p=shop');
+            $q = max(1, (int)post('qty', 1)); $cur = (int)($_SESSION['cart'][$id] ?? 0);
+            $new = $pr['type'] === 'digital' ? 1 : $cur + $q;
+            if ($pr['stock'] !== null && $new > (int)$pr['stock']) { flash('Only ' . (int)$pr['stock'] . ' in stock', 'err'); redirect(post('back', "?p=product&id=$id")); }
+            $_SESSION['cart'][$id] = $new;
+            flash('Added to cart — ' . $pr['title']); redirect(post('back', '?p=cart'));
+        case 'cart_update':
+            foreach ((array)($_POST['qty'] ?? []) as $pid => $q) { $q = (int)$q; if ($q <= 0) unset($_SESSION['cart'][(int)$pid]); else $_SESSION['cart'][(int)$pid] = min($q, 99); }
+            redirect('?p=cart');
+        case 'checkout':
+            $items = cart_items(); if (!$items) redirect('?p=shop');
+            foreach ($items as $it) if ($it['stock'] !== null && $it['qty'] > (int)$it['stock']) { flash($it['title'] . ': only ' . (int)$it['stock'] . ' left', 'err'); redirect('?p=cart'); }
+            $phys = (bool)array_filter($items, fn($i) => $i['type'] === 'physical');
+            if ($phys && (post('address') === '' || post('city') === '' || post('phone') === '')) { flash('Please enter delivery address, city and phone', 'err'); redirect('?p=cart'); }
+            $pm = in_array(post('pay_method'), ['COD', 'JazzCash', 'EasyPaisa', 'Bank'], true) ? post('pay_method') : 'COD';
+            if ($pm === 'COD' && (!$phys || setting('shop_cod', '1') !== '1')) $pm = 'JazzCash';
+            try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=cart'); }
+            $sub = array_sum(array_column($items, 'line')); $ship = shipping_for($sub, $phys);
+            $sid = role('parent') && is_parent_of((int)post('student_id')) ? (int)post('student_id') : (role('student') ? (int)$me['id'] : null);
+            q('INSERT INTO orders(user_id,student_id,subtotal,shipping,total,name,phone,address,city,pay_method,proof,txn_ref,note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', [$me['id'], $sid, $sub, $ship, $sub + $ship, post('name') ?: $me['name'], post('phone') ?: $me['phone'], post('address'), post('city'), $pm, $proof, post('txn_ref'), post('note')]);
+            $oid = (int)db()->lastInsertId();
+            foreach ($items as $it) {
+                q('INSERT INTO order_items(order_id,product_id,title,price,qty,type) VALUES(?,?,?,?,?,?)', [$oid, $it['id'], $it['title'], $it['price'], $it['qty'], $it['type']]);
+                if ($it['stock'] !== null) q('UPDATE products SET stock=GREATEST(0,stock-?) WHERE id=?', [$it['qty'], $it['id']]);
+            }
+            unset($_SESSION['cart']);
+            notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New shop order ' . order_no(['id' => $oid]), $me['name'] . ' · ' . money($sub + $ship) . ' · ' . $pm, "?p=order&id=$oid", '🛒');
+            flash('Order placed! ' . ($pm === 'COD' ? 'Pay cash on delivery.' : ($proof || post('txn_ref') ? 'We will confirm your payment shortly.' : 'Please upload your payment proof on the order page.')));
+            redirect("?p=order&id=$oid");
+        case 'order_proof':
+            $o = one('SELECT * FROM orders WHERE id=? AND user_id=? AND status="pending"', [$id, $me['id']]); if (!$o) redirect('?p=orders');
+            try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=order&id=$id"); }
+            q('UPDATE orders SET proof=IF(?="",proof,?),txn_ref=?,pay_method=? WHERE id=?', [$proof, $proof, post('txn_ref'), post('pay_method', $o['pay_method']), $id]);
+            flash('Payment proof uploaded'); redirect("?p=order&id=$id");
+        case 'order_cancel':
+            $o = one('SELECT * FROM orders WHERE id=? AND status="pending"', [$id]);
+            if ($o && (role('admin') || (int)$o['user_id'] === (int)$me['id'])) {
+                q('UPDATE orders SET status="cancelled" WHERE id=?', [$id]);
+                foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
+                flash('Order cancelled');
+            }
+            redirect("?p=order&id=$id");
+        case 'order_status':
+            require_role('admin');
+            $o = one('SELECT * FROM orders WHERE id=?', [$id]); $st = post('status');
+            if ($o && isset(ORDER_ST[$st])) {
+                $paidNow = in_array($st, ['paid', 'processing', 'shipped', 'delivered'], true) && !$o['payment_id'] && ($o['pay_method'] !== 'COD' || $st === 'delivered' || $st === 'paid');
+                if ($paidNow) { q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$o['student_id'] ?: $o['user_id'], null, $o['total'], $o['pay_method'] === 'COD' ? 'Cash' : $o['pay_method'], 'Shop ' . order_no($o), date('Y-m-d'), $me['id']]); q('UPDATE orders SET payment_id=? WHERE id=?', [(int)db()->lastInsertId(), $id]); }
+                if ($st === 'cancelled' && $o['status'] !== 'cancelled') foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
+                q('UPDATE orders SET status=?,tracking=?,admin_note=? WHERE id=?', [$st, post('tracking'), post('admin_note'), $id]);
+                if ($st !== $o['status']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], post('tracking') ? 'Tracking: ' . post('tracking') : (post('admin_note') ?: ''), "?p=order&id=$id", '📦');
+                flash('Order updated');
+            }
+            redirect("?p=order&id=$id");
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title', 'shop_shipping', 'shop_free_over', 'shop_cod'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
             $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
@@ -502,6 +583,16 @@ if ($p === 'sub_file') {
     if (!$sb || !$sb['file'] || !((int)$sb['user_id'] === (int)user()['id'] || can_manage_course($sb) || is_parent_of((int)$sb['user_id']))) { http_response_code(404); exit; }
     $path = UPLOAD_DIR . '/' . basename($sb['file']); if (!is_file($path)) { http_response_code(404); exit; }
     header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
+}
+if ($p === 'dl' || $p === 'order_proof_file') {
+    require_login();
+    if ($p === 'dl') {
+        $it = one('SELECT oi.*,o.user_id,o.student_id,o.status,pr.file FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products pr ON pr.id=oi.product_id WHERE oi.id=?', [$id]);
+        $ok = $it && $it['file'] && in_array($it['status'], ['paid', 'processing', 'shipped', 'delivered'], true) && (role('admin') || (int)$it['user_id'] === (int)user()['id'] || (int)$it['student_id'] === (int)user()['id']);
+        $f = $ok ? $it['file'] : '';
+    } else { $o = one('SELECT * FROM orders WHERE id=?', [$id]); $f = $o && (role('admin') || (int)$o['user_id'] === (int)user()['id']) ? $o['proof'] : ''; }
+    $path = UPLOAD_DIR . '/' . basename((string)$f); if (!$f || !is_file($path)) { http_response_code(404); exit('Not available'); }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: ' . ($p === 'dl' ? 'attachment; filename="' . preg_replace('/[^\w.-]+/', '-', $it['title'] ?? 'file') . '.' . pathinfo($path, PATHINFO_EXTENSION) . '"' : 'inline')); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
 }
 if ($p === 'proof_file') {
     require_login();

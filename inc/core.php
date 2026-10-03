@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.1.0';
-const DB_VERSION = 11;
+const APP_VERSION = '2.2.0';
+const DB_VERSION = 12;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -96,6 +96,9 @@ function migrate() {
         db()->exec("ALTER TABLE payment_requests ADD voucher_id INT NULL");
     if (!str_contains((string)val("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='role'"), 'parent'))
         db()->exec("ALTER TABLE users MODIFY role ENUM('admin','teacher','student','parent') NOT NULL DEFAULT 'student'");
+    foreach (['program' => "VARCHAR(20) NOT NULL DEFAULT 'course'", 'level' => "VARCHAR(60) DEFAULT ''"] as $col => $def)
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='courses' AND COLUMN_NAME=?", [$col]))
+            db()->exec("ALTER TABLE courses ADD $col $def");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -361,3 +364,34 @@ function child_id(): int { // parent: selected child (or first); others: self
     $c = (int)get('child'); if ($c && is_parent_of($c)) return $c;
     return (int)(val('SELECT student_id FROM parent_links WHERE parent_id=? ORDER BY student_id LIMIT 1', [$u['id']]) ?: 0);
 }
+
+/* ---------------- Programs ---------------- */
+const PROGRAMS = ['course' => ['Course', '📘'], 'homeschool' => ['Homeschooling', '🏠'], 'trainer' => ['Train the Trainer', '🎤']];
+function program_label(?string $p): string { return (PROGRAMS[$p ?: 'course'] ?? PROGRAMS['course'])[1] . ' ' . (PROGRAMS[$p ?: 'course'] ?? PROGRAMS['course'])[0]; }
+// Parent enrolls a child: enrollment (pending if paid) + automatic fee voucher
+function enroll_child(int $childId, array $c): string {
+    $fee = (float)$c['fee'];
+    $status = ($fee > 0 && setting('paid_needs_approval', '1') === '1') ? 'pending' : 'active';
+    if (val('SELECT id FROM enrollments WHERE user_id=? AND course_id=?', [$childId, $c['id']])) return 'already';
+    q('INSERT INTO enrollments(user_id,course_id,status,fee) VALUES(?,?,?,?)', [$childId, $c['id'], $status, $fee]);
+    if ($fee > 0) create_voucher($childId, (int)$c['id'], 'Enrollment fee — ' . $c['title'], $fee, date('Y-m-d', strtotime('+3 days')), 0, null, '', 0);
+    return $status;
+}
+
+/* ---------------- Shop ---------------- */
+const ORDER_ST = ['pending' => ['Pending', 'warn'], 'paid' => ['Paid', 'ok'], 'processing' => ['Processing', ''], 'shipped' => ['Shipped', ''], 'delivered' => ['Delivered', 'ok'], 'cancelled' => ['Cancelled', 'err']];
+function cart(): array { return $_SESSION['cart'] ?? []; }
+function cart_count(): int { return array_sum(cart()); }
+function cart_items(): array {
+    $c = cart(); if (!$c) return [];
+    $rows = all('SELECT * FROM products WHERE active=1 AND id IN (' . implode(',', array_map('intval', array_keys($c))) . ')');
+    foreach ($rows as &$r) { $r['qty'] = $r['type'] === 'digital' ? 1 : (int)$c[$r['id']]; $r['line'] = $r['qty'] * (float)$r['price']; }
+    return $rows;
+}
+function shipping_for(float $sub, bool $physical): float {
+    if (!$physical) return 0;
+    $free = (float)setting('shop_free_over', '0');
+    return ($free > 0 && $sub >= $free) ? 0 : (float)setting('shop_shipping', '250');
+}
+function order_no(array $o): string { return 'ORD-' . str_pad((string)$o['id'], 5, '0', STR_PAD_LEFT); }
+function product_img(array $p): string { return $p['image'] ? photo_url($p['image']) : ''; }

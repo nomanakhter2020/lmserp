@@ -20,6 +20,9 @@ $cats = all('SELECT c.*,(SELECT COUNT(*) FROM courses WHERE category_id=c.id) n 
   <label>EasyPaisa<input name="pay_easypaisa" value="<?= e(setting('pay_easypaisa')) ?>" placeholder="0345-1234567 · Account title"></label>
   <label>Cash instructions<input name="pay_cash" value="<?= e(setting('pay_cash')) ?>" placeholder="Pay at office, Mon–Sat 10am–6pm"></label>
   <label>Teacher discount on courses (%) <small>(0 = full price, 100 = free)</small><input name="teacher_discount" type="number" min="0" max="100" value="<?= (int)setting('teacher_discount', '0') ?>"></label>
+  <h3>Shop</h3>
+  <div class="two"><label>Delivery charge (PKR)<input name="shop_shipping" type="number" min="0" value="<?= e(setting('shop_shipping', '250')) ?>"></label><label>Free delivery above (PKR) <small>0 = never</small><input name="shop_free_over" type="number" min="0" value="<?= e(setting('shop_free_over', '0')) ?>"></label></div>
+  <input type="hidden" name="shop_cod" value="0"><label class="check"><input type="checkbox" name="shop_cod" value="1" <?= setting('shop_cod', '1') === '1' ? 'checked' : '' ?>> Allow Cash on Delivery</label>
   <h3 id="cert">Certificates</h3>
   <input type="hidden" name="cert_auto" value="0"><label class="check"><input type="checkbox" name="cert_auto" value="1" <?= setting('cert_auto', '1') === '1' ? 'checked' : '' ?>> Issue certificate automatically when a student completes all lessons and passes all quizzes</label>
   <div class="two"><label>Signed by<input name="cert_signer" value="<?= e(setting('cert_signer')) ?>" placeholder="e.g. Noman Akhter"></label><label>Signer title<input name="cert_signer_title" value="<?= e(setting('cert_signer_title')) ?>" placeholder="e.g. Director"></label></div>

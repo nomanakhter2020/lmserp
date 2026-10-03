@@ -28,6 +28,7 @@ if (role('admin')):
 </div>
 <?php if ($np = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')): ?><a class="alert warn" href="?p=proofs" style="display:block">🧾 <?= $np ?> payment proof<?= $np > 1 ? 's' : '' ?> waiting for verification ›</a><?php endif ?>
 <?php if ($odv = one('SELECT COUNT(*) n, COALESCE(SUM(amount-discount+late_fee),0) t FROM fee_vouchers WHERE status="unpaid" AND due_date<CURDATE()')) if ($odv['n']): ?><a class="alert err" href="?p=vouchers&f=overdue" style="display:block">📄 <?= $odv['n'] ?> overdue fee voucher<?= $odv['n'] > 1 ? 's' : '' ?> · <?= money($odv['t']) ?> ›</a><?php endif ?>
+<?php if ($npo = (int)val('SELECT COUNT(*) FROM orders WHERE status="pending"')): ?><a class="alert warn" href="?p=orders&f=pending" style="display:block">🛒 <?= $npo ?> new shop order<?= $npo > 1 ? 's' : '' ?> to confirm ›</a><?php endif ?>
 <?php if ($nr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')): ?><a class="alert warn" href="?p=posts&f=pending" style="display:block">✍️ <?= $nr ?> blog article<?= $nr > 1 ? 's' : '' ?> waiting for your approval ›</a><?php endif ?>
 <?php if ($pending): ?>
 <h2>Pending enrollments</h2>
@@ -81,7 +82,7 @@ if (role('admin')):
   <div class="bar light"><i style="width:<?= $pc ?>%"></i></div><div class="muted-l"><?= $pc ?>% complete · Resume ›</div>
 </a>
 <?php endif ?>
-<div class="quick"><a href="?p=courses">🔎 Browse courses</a><a href="?p=fees">💳 My fees (<?= money($paid) ?>)</a></div>
+<div class="quick"><a href="?p=shop">🛒 Shop books</a><a href="?p=courses">🔎 Browse courses</a><a href="?p=fees">💳 My fees (<?= money($paid) ?>)</a></div>
 <?php endif ?>
 
 <?php require __DIR__ . '/_teachers_strip.php'; ?>

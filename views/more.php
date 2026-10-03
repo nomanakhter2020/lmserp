@@ -1,6 +1,8 @@
 <?php
 $title = 'More';
 $items = [
+  ['orders', '🛒', role('admin') ? 'Shop orders' . (($po = (int)val('SELECT COUNT(*) FROM orders WHERE status="pending"')) ? " ($po)" : '') : 'My orders', true],
+  ['products', '📚', 'Shop products', role('admin')],
   ['batches', '🗓️', 'Batches & attendance', role('admin', 'teacher')],
   ['assignments', '📝', 'Assignments', true],
   ['exams', '🧾', role('admin', 'teacher') ? 'Exams & results' : 'Results', true],

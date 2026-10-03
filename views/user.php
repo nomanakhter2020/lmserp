@@ -19,6 +19,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <div class="quick">
   <?php if ($wa): ?><a href="https://wa.me/<?= $wa ?>" target="_blank" rel="noopener">💬 WhatsApp</a><a href="tel:<?= e($u['phone']) ?>">📞 Call</a><?php endif ?>
   <?php if (role('admin')): ?><a href="?p=user_edit&id=<?= $id ?>">✏️ Edit</a><?php endif ?>
+  <?php if (role('admin') && $u['role'] === 'student' && val('SELECT 1 FROM certificates ce JOIN courses c ON c.id=ce.course_id WHERE ce.user_id=? AND c.program="trainer" AND ce.revoked=0', [$id])): ?><form method="post" style="display:inline" onsubmit="return confirm('Make this certified trainer a teacher?')"><?= csrf_field() ?><input type="hidden" name="a" value="promote_trainer"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn sm">🎤 Promote to teacher</button></form><?php endif ?>
   <?php if (role('admin') && $u['role'] !== 'student'): ?><a href="?p=tprofile&id=<?= $id ?>">🪪 CV profile</a><a href="?p=teacher&id=<?= $id ?>" target="_blank">🌐 View CV</a><?php endif ?>
 </div>
 <?php if (role('admin') && $u['role'] !== 'admin'): ?>
@@ -70,7 +71,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
   <label class="check"><input type="checkbox" name="activate" value="1" checked> Approve pending enrollment</label>
   <button class="btn block">Save payment</button></form></details>
 <div class="list"><?php foreach ($pays as $p): ?>
-  <div class="row"><div class="grow"><b><?= money($p['amount']) ?></b><small><?= e($p['paid_on']) ?> · <?= e($p['method']) ?> · <?= e($p['title'] ?: 'General') ?></small></div><a class="small" href="?p=receipt&id=<?= $p['id'] ?>">Receipt</a></div>
+  <div class="row"><div class="grow"><b><?= money($p['amount']) ?></b><small><?= e($p['paid_on']) ?> · <?= e($p['method']) ?> · <?= e($p['title'] ?: ($p['note'] ?: 'General')) ?></small></div><a class="small" href="?p=receipt&id=<?= $p['id'] ?>">Receipt</a></div>
 <?php endforeach ?></div>
 <?php endif ?>
 

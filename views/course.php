@@ -13,7 +13,7 @@ $ann = all('SELECT * FROM announcements WHERE course_id=? ORDER BY id DESC LIMIT
 $pc = $en ? course_progress((int)$me['id'], $id) : 0;
 ?>
 <div class="hero" style="--c:<?= e($c['color']) ?>">
-  <div class="muted-l"><?= e($c['cname'] ?: 'General') ?> · <?= $c['teacher_id'] ? '<a class="tlink" href="?p=teacher&id=' . (int)$c['teacher_id'] . '">' . e($c['tname']) . ' ›</a>' : 'No teacher' ?></div>
+ <div class="muted-l"><?= $c['program'] !== 'course' ? program_label($c['program']) . ' · ' : '' ?><?= $c['level'] ? e($c['level']) . ' · ' : '' ?><?= e($c['cname'] ?: 'General') ?> · <?= $c['teacher_id'] ? '<a class="tlink" href="?p=teacher&id=' . (int)$c['teacher_id'] . '">' . e($c['tname']) . ' ›</a>' : 'No teacher' ?></div>
   <div class="big sm"><?= e($c['title']) ?></div>
   <?php if ($en && $access): ?><div class="bar light"><i style="width:<?= $pc ?>%"></i></div><div class="muted-l"><?= $pc ?>% complete</div><?php endif ?>
   <div class="split"><div><b><?= count($lessons) ?></b><span>Lessons</span></div><div><b><?= count($quizzes) ?></b><span>Quizzes</span></div><div><b><?= (float)$c['fee'] > 0 ? money($c['fee']) : 'Free' ?></b><span>Fee</span></div></div>
@@ -21,6 +21,14 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
 <?php if ($c['cover']): ?><img class="cover-img" src="<?= e(cover_url($c)) ?>" alt=""><?php endif ?>
 <?php if ($c['description']): ?><p class="desc"><?= nl2br(e($c['description'])) ?></p><?php endif ?>
 
+<?php if (role('parent')): $kids = my_children(); ?>
+  <?php if ($kids): ?><form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="enroll_child"><input type="hidden" name="id" value="<?= $id ?>">
+    <h3>👨‍👩‍👧 Enroll your child</h3>
+    <?php foreach ($kids as $k): $ke = val('SELECT status FROM enrollments WHERE user_id=? AND course_id=?', [$k['id'], $id]); ?><label class="check"><input type="radio" name="child_id" value="<?= $k['id'] ?>" <?= $ke ? 'disabled' : '' ?> required> <?= e($k['name']) ?><?= $ke ? ' — ' . ucfirst($ke) : '' ?></label><?php endforeach ?>
+    <button class="btn block"><?= (float)$c['fee'] > 0 ? 'Enroll · ' . money($c['fee']) : 'Enroll for free' ?></button>
+    <?php if ((float)$c['fee'] > 0): ?><small class="muted">A fee voucher is created — pay by JazzCash, EasyPaisa, bank or cash and upload the proof.</small><?php endif ?></form>
+  <?php else: ?><div class="alert warn">Ask the institute to link your child to your parent account to enroll.</div><?php endif ?>
+<?php endif ?>
 <?php $myFee = course_fee_for($c); if (can_enroll($c) && !$manage): ?>
   <?php if (role('teacher') && $myFee < (float)$c['fee']): ?><div class="alert">👩‍🏫 Teacher price: <b><?= money($myFee) ?></b> <s><?= money($c['fee']) ?></s></div><?php endif ?>
   <?php if (!$en): ?>
@@ -66,9 +74,14 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
   <?php endif ?>
 <?php endif ?>
 <?php if ($manage): ?>
-<div class="quick"><a href="?p=course_edit&id=<?= $id ?>">✏️ Edit</a><a href="?p=lesson_edit&course=<?= $id ?>">＋ Lesson</a><a href="?p=quiz_edit&course=<?= $id ?>">＋ Quiz</a><a href="?p=enrollments&course=<?= $id ?>">👥 Students</a><a href="?p=batch_edit&course=<?= $id ?>">🗓️ New batch</a><a href="?p=assign_edit&course=<?= $id ?>">📝 Assignment</a><a href="?p=exam_edit&course=<?= $id ?>">🧾 Exam</a></div>
+<div class="quick"><a href="?p=course_edit&id=<?= $id ?>">✏️ Edit</a><a href="?p=lesson_edit&course=<?= $id ?>">＋ Lesson</a><a href="?p=quiz_edit&course=<?= $id ?>">＋ Quiz</a><a href="?p=enrollments&course=<?= $id ?>">👥 Students</a><a href="?p=batch_edit&course=<?= $id ?>">🗓️ New batch</a><a href="?p=assign_edit&course=<?= $id ?>">📝 Assignment</a><a href="?p=exam_edit&course=<?= $id ?>">🧾 Exam</a><?php if (role('admin')): ?><a href="?p=product_edit&course=<?= $id ?>">📚 Add material</a><?php endif ?></div>
 <?php endif ?>
 
+<?php $mats = all('SELECT * FROM products WHERE course_id=? AND active=1', [$id]); if ($mats): ?>
+<h2>📚 Required materials</h2>
+<div class="list"><?php foreach ($mats as $m): ?><div class="row"><div class="cthumb" style="<?= $m['image'] ? "background-image:url('" . e(product_img($m)) . "')" : '' ?>"></div><a class="grow" href="?p=product&id=<?= $m['id'] ?>"><b><?= e($m['title']) ?></b><small><?= money($m['price']) ?><?= $m['type'] === 'digital' ? ' · PDF' : '' ?></small></a>
+  <?php if (!role('admin', 'teacher')): ?><form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="cart_add"><input type="hidden" name="id" value="<?= $m['id'] ?>"><input type="hidden" name="back" value="?p=course&id=<?= $id ?>"><button class="btn sm">🛒 Add</button></form><?php endif ?></div><?php endforeach ?></div>
+<?php endif ?>
 <h2>Lessons</h2>
 <div class="list">
 <?php foreach ($lessons as $i => $l): ?>

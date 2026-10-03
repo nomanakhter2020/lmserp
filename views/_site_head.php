@@ -24,7 +24,7 @@ $cta = $me ? '?p=home' : ($canReg ? '?p=register' : '?p=login');
   <div class="container nav-in">
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
-      <a href="./#courses">Courses</a><a href="./#teachers">Teachers</a><a href="blog">Blog</a><a href="about">About</a><a href="contact">Contact</a>
+      <a href="./#courses">Courses</a><a href="./#teachers">Teachers</a><a href="blog">Blog</a><a href="?p=shop">Shop</a><a href="about">About</a><a href="contact">Contact</a>
       <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a><?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>">Enroll now</a><?php endif ?>
     </nav>
     <div class="nav-cta"><?php if ($me): ?><a class="btn" href="?p=home">My dashboard →</a><?php else: ?><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?><?php endif ?></div>

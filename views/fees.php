@@ -11,7 +11,7 @@ if (!role('admin')) {
     <h2>Fee vouchers to pay</h2><div class="list"><?php foreach ($vs as $v): $od = voucher_overdue($v); ?>
       <a class="row" href="?p=voucher&id=<?= $v['id'] ?>"><div class="grow"><b><?= e($v['title']) ?></b><small><?= voucher_no($v) ?> · due <?= date('d M Y', strtotime($v['due_date'])) ?></small></div><div style="text-align:right"><b class="<?= $od ? 'neg' : '' ?>"><?= money(voucher_total($v)) ?></b><br><span class="pill <?= $od ? 'err' : 'warn' ?>"><?= $od ? 'Overdue' : 'Unpaid' ?></span></div></a>
     <?php endforeach ?></div><h2>Payment history</h2><?php endif ?>
-    <div class="list"><?php foreach ($pays as $p): ?><a class="row" href="?p=receipt&id=<?= $p['id'] ?>"><div class="grow"><b><?= money($p['amount']) ?></b><small><?= e($p['paid_on']) ?> · <?= e($p['title'] ?: 'General') ?></small></div><span>Receipt ›</span></a><?php endforeach ?></div>
+    <div class="list"><?php foreach ($pays as $p): ?><a class="row" href="?p=receipt&id=<?= $p['id'] ?>"><div class="grow"><b><?= money($p['amount']) ?></b><small><?= e($p['paid_on']) ?> · <?= e($p['title'] ?: ($p['note'] ?: 'General')) ?></small></div><span>Receipt ›</span></a><?php endforeach ?></div>
     <?php if (!$pays): ?><p class="empty">No payments yet</p><?php endif;
     return;
 }
@@ -33,7 +33,7 @@ $dues = all('SELECT * FROM (SELECT u.id,u.name,u.phone,SUM(COALESCE(e.fee,c.fee)
   <label class="check"><input type="checkbox" name="activate" value="1" checked> Approve pending enrollment</label>
   <button class="btn block">Save payment</button></form></details>
 <div class="list"><?php foreach ($pays as $p): ?>
-  <div class="row"><div class="grow"><a href="?p=user&id=<?= $p['user_id'] ?>"><b><?= e($p['name']) ?></b></a><small><?= e($p['paid_on']) ?> · <?= e($p['method']) ?> · <?= e($p['title'] ?: 'General') ?></small></div>
+  <div class="row"><div class="grow"><a href="?p=user&id=<?= $p['user_id'] ?>"><b><?= e($p['name']) ?></b></a><small><?= e($p['paid_on']) ?> · <?= e($p['method']) ?> · <?= e($p['title'] ?: ($p['note'] ?: 'General')) ?></small></div>
     <b class="pos"><?= money($p['amount']) ?></b>
     <a class="x" href="?p=receipt&id=<?= $p['id'] ?>" aria-label="Receipt">🧾</a>
     <form method="post" onsubmit="return confirm('Delete payment?')"><?= csrf_field() ?><input type="hidden" name="a" value="payment_delete"><input type="hidden" name="id" value="<?= $p['id'] ?>"><button class="x">✕</button></form></div>
