@@ -529,15 +529,12 @@ if ($isPost) {
         case 'order_status':
             require_role('admin');
             $o = one('SELECT * FROM orders WHERE id=?', [$id]); $st = post('status');
-            if ($o && isset(ORDER_ST[$st])) {
-                $paidNow = in_array($st, ['paid', 'processing', 'shipped', 'delivered'], true) && !$o['payment_id'] && ($o['pay_method'] !== 'COD' || $st === 'delivered' || $st === 'paid');
-                if ($paidNow) { q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$o['student_id'] ?: $o['user_id'], null, $o['total'], $o['pay_method'] === 'COD' ? 'Cash' : $o['pay_method'], 'Shop ' . order_no($o), date('Y-m-d'), $me['id']]); q('UPDATE orders SET payment_id=? WHERE id=?', [(int)db()->lastInsertId(), $id]); }
-                if ($st === 'cancelled' && $o['status'] !== 'cancelled') foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
-                q('UPDATE orders SET status=?,tracking=?,admin_note=? WHERE id=?', [$st, post('tracking'), post('admin_note'), $id]);
-                if ($st !== $o['status'] && $o['user_id']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], post('tracking') ? 'Tracking: ' . post('tracking') : (post('admin_note') ?: ''), "?p=order&id=$id", '📦');
-                flash('Order updated');
-            }
+            if ($o && isset(ORDER_ST[$st])) { set_order_status($o, $st, post('tracking'), post('admin_note')); flash('Order updated'); }
             redirect("?p=order&id=$id");
+        case 'order_bulk':
+            require_role('admin'); $st = post('status'); $n = 0;
+            if (isset(ORDER_ST[$st])) foreach (array_map('intval', (array)($_POST['ids'] ?? [])) as $oid) { $o = one('SELECT * FROM orders WHERE id=?', [$oid]); if ($o && $o['status'] !== $st) { set_order_status($o, $st, $o['tracking'], $o['admin_note']); $n++; } }
+            flash("$n order(s) marked " . (ORDER_ST[$st][0] ?? '')); redirect('?p=orders&f=' . post('f', 'open'));
         case 'shop_seed':
             require_role('admin'); @set_time_limit(300); require __DIR__ . '/inc/shop_seed.php';
             [$np, $no, $ni] = shop_seed(); $errs = array_unique($GLOBALS['demo_err'] ?? []);

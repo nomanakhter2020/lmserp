@@ -1,6 +1,6 @@
 <?php
 $me = user();
-$r = one('SELECT p.*,u.name,u.phone,u.email,c.title FROM payments p JOIN users u ON u.id=p.user_id LEFT JOIN courses c ON c.id=p.course_id WHERE p.id=?', [$id]);
+$r = one('SELECT p.*,COALESCE(u.name,p.note) name,u.phone,u.email,c.title FROM payments p LEFT JOIN users u ON u.id=p.user_id LEFT JOIN courses c ON c.id=p.course_id WHERE p.id=?', [$id]);
 if (!$r || (!role('admin') && (int)$r['user_id'] !== (int)$me['id'] && !is_parent_of((int)$r['user_id']))) { echo '<p class="empty">Not found</p>'; return; }
 $title = 'Receipt #' . $r['id']; $back = role('admin') ? "?p=user&id={$r['user_id']}" : '?p=fees';
 ?>
@@ -15,6 +15,6 @@ $title = 'Receipt #' . $r['id']; $back = role('admin') ? "?p=user&id={$r['user_i
   <hr><div class="kv total"><span>Amount paid</span><b><?= money($r['amount']) ?></b></div>
 </div>
 <div class="pager"><button class="btn ghost" onclick="window.print()">🖨 Print / PDF</button>
-<?php $wa = preg_replace('/\D/', '', $r['phone']); if (str_starts_with($wa, '0')) $wa = '92' . substr($wa, 1);
+<?php $wa = preg_replace("/\\D/", "", (string)$r["phone"]); if (str_starts_with($wa, '0')) $wa = '92' . substr($wa, 1);
  if ($wa && role('admin')): $msg = rawurlencode("Assalam o Alaikum {$r['name']}, we have received your payment of " . money($r['amount']) . ' on ' . date('d M Y', strtotime($r['paid_on'])) . ' for ' . ($r['title'] ?: 'fees') . '. Receipt #' . $r['id'] . '. Thank you! - ' . setting('institute')); ?>
 <a class="btn" href="https://wa.me/<?= $wa ?>?text=<?= $msg ?>" target="_blank" rel="noopener">💬 Send on WhatsApp</a><?php endif ?></div>

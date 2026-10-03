@@ -6,7 +6,7 @@ date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
 const APP_VERSION = '2.4.0';
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -101,6 +101,8 @@ function migrate() {
             db()->exec("ALTER TABLE courses ADD $col $def");
     if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND COLUMN_NAME='user_id'") === 'NO')
         db()->exec("ALTER TABLE orders MODIFY user_id INT NULL");
+    if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payments' AND COLUMN_NAME='user_id'") === 'NO')
+        db()->exec("ALTER TABLE payments MODIFY user_id INT NULL");
     foreach (['email' => "VARCHAR(160) DEFAULT ''", 'token' => "VARCHAR(32) DEFAULT ''"] as $col => $def)
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND COLUMN_NAME=?", [$col]))
             db()->exec("ALTER TABLE orders ADD $col $def");
@@ -426,6 +428,17 @@ function place_order(array $f): int|string {
     $_SESSION['my_orders'][$oid] = $tok;
     notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New shop order ' . order_no(['id' => $oid]), trim($f['name']) . ' · ' . money($sub + $ship) . ' · ' . $pm . ($u ? '' : ' · guest'), "?p=order&id=$oid", '🛒');
     return $oid;
+}
+// Change order status: records payment, restocks on cancel, auto-delivers digital-only orders, notifies
+function set_order_status(array $o, string $st, ?string $tracking, ?string $note): void {
+    $id = (int)$o['id']; $me = user();
+    $digital = !val('SELECT COUNT(*) FROM order_items WHERE order_id=? AND type="physical"', [$id]);
+    if ($digital && in_array($st, ['paid', 'processing'], true)) $st = 'delivered';
+    $paidNow = in_array($st, ['paid', 'processing', 'shipped', 'delivered'], true) && !$o['payment_id'] && ($o['pay_method'] !== 'COD' || $st === 'delivered' || $st === 'paid');
+    if ($paidNow) { q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$o['student_id'] ?: $o['user_id'], null, $o['total'], $o['pay_method'] === 'COD' ? 'Cash' : $o['pay_method'], 'Shop ' . order_no($o) . ($o['user_id'] ? '' : ' · ' . $o['name']), date('Y-m-d'), $me['id'] ?? null]); q('UPDATE orders SET payment_id=? WHERE id=?', [(int)db()->lastInsertId(), $id]); }
+    if ($st === 'cancelled' && $o['status'] !== 'cancelled') foreach (all('SELECT product_id,qty FROM order_items WHERE order_id=?', [$id]) as $it) q('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL', [$it['qty'], $it['product_id']]);
+    q('UPDATE orders SET status=?,tracking=?,admin_note=? WHERE id=?', [$st, $tracking, $note, $id]);
+    if ($st !== $o['status'] && $o['user_id']) notify((int)$o['user_id'], order_no($o) . ': ' . ORDER_ST[$st][0], $tracking ? 'Tracking: ' . $tracking : ($note ?: ''), "?p=order&id=$id", '📦');
 }
 function can_view_order(array $o): bool {
     $u = user();

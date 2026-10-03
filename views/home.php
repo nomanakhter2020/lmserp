@@ -14,7 +14,7 @@ if (role('admin')):
   ];
   $inc = (float)val('SELECT COALESCE(SUM(amount),0) FROM payments WHERE DATE_FORMAT(paid_on,"%Y-%m")=?', [$m]);
   $exp = (float)val('SELECT COALESCE(SUM(amount),0) FROM expenses WHERE DATE_FORMAT(spent_on,"%Y-%m")=?', [$m]);
-  $recent = all('SELECT p.*,u.name FROM payments p JOIN users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 5');
+  $recent = all('SELECT p.*,COALESCE(u.name,p.note) name FROM payments p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 5');
   $pending = all('SELECT e.*,u.name,c.title,c.fee FROM enrollments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id WHERE e.status="pending" ORDER BY e.id DESC LIMIT 5');
 ?>
 <?php require __DIR__ . '/_checklist.php'; ?>
