@@ -139,8 +139,29 @@ if ($isPost) {
         case 'payment_delete':
             require_role('admin'); q('DELETE FROM payments WHERE id=?', [$id]); flash('Payment deleted'); redirect('?p=fees');
         case 'expense_add':
-            require_role('admin'); q('INSERT INTO expenses(title,amount,spent_on) VALUES(?,?,?)', [post('title'), (float)post('amount'), post('spent_on', date('Y-m-d'))]);
-            flash('Expense added'); redirect('?p=expenses');
+            require_role('admin');
+            q('INSERT INTO expenses(title,amount,spent_on,category_id,note) VALUES(?,?,?,?,?)', [post('title'), (float)post('amount'), post('spent_on', date('Y-m-d')), (int)post('category_id') ?: null, post('note')]);
+            $eid = (int)db()->lastInsertId();
+            if (post('make_recurring')) {
+                $f = in_array(post('frequency'), ['monthly', 'weekly', 'yearly'], true) ? post('frequency') : 'monthly';
+                q('INSERT INTO recurring_expenses(title,amount,category_id,frequency,next_date) VALUES(?,?,?,?,?)', [post('title'), (float)post('amount'), (int)post('category_id') ?: null, $f, next_due(post('spent_on', date('Y-m-d')), $f)]);
+                q('UPDATE expenses SET recurring_id=? WHERE id=?', [(int)db()->lastInsertId(), $eid]);
+            }
+            flash('Expense added'); redirect('?p=expenses&m=' . substr(post('spent_on', date('Y-m-d')), 0, 7));
+        case 'recurring_save':
+            require_role('admin');
+            $f = in_array(post('frequency'), ['monthly', 'weekly', 'yearly'], true) ? post('frequency') : 'monthly';
+            $data = [post('title'), (float)post('amount'), (int)post('category_id') ?: null, $f, post('next_date', date('Y-m-d')), post('active') ? 1 : 0, post('note')];
+            if ($id) q('UPDATE recurring_expenses SET title=?,amount=?,category_id=?,frequency=?,next_date=?,active=?,note=? WHERE id=?', [...$data, $id]);
+            else q('INSERT INTO recurring_expenses(title,amount,category_id,frequency,next_date,active,note) VALUES(?,?,?,?,?,?,?)', $data);
+            $posted = run_recurring();
+            flash('Recurring expense saved' . ($posted ? " · $posted entr" . ($posted > 1 ? 'ies' : 'y') . ' posted' : '')); redirect('?p=recurring');
+        case 'recurring_delete':
+            require_role('admin'); q('DELETE FROM recurring_expenses WHERE id=?', [$id]); flash('Recurring expense removed (past entries kept)'); redirect('?p=recurring');
+        case 'expcat_add':
+            require_role('admin'); q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [post('name'), post('icon') ?: '💸']); redirect('?p=expense_cats');
+        case 'expcat_delete':
+            require_role('admin'); q('UPDATE expenses SET category_id=NULL WHERE category_id=?', [$id]); q('UPDATE recurring_expenses SET category_id=NULL WHERE category_id=?', [$id]); q('DELETE FROM expense_categories WHERE id=?', [$id]); redirect('?p=expense_cats');
         case 'expense_delete':
             require_role('admin'); q('DELETE FROM expenses WHERE id=?', [$id]); redirect('?p=expenses');
         case 'announce':
@@ -229,6 +250,7 @@ if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
 if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register'], true)) require_login();
 
+if (role('admin')) run_recurring();
 $view = __DIR__ . "/views/$p.php";
 $page = $p;
 if (!is_file($view)) { $p = $page = "home"; $view = __DIR__ . "/views/home.php"; }

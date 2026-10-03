@@ -11,6 +11,7 @@ for ($i = 5; $i >= 0; $i--) {
     ];
 }
 $max = max(1, ...array_values(array_map(fn($x) => max($x[0], $x[1]), $months)));
+$ecat = all('SELECT COALESCE(c.name,"Uncategorised") name,COALESCE(c.icon,"💸") icon,SUM(e.amount) t FROM expenses e LEFT JOIN expense_categories c ON c.id=e.category_id WHERE e.spent_on>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH) GROUP BY c.id ORDER BY t DESC');
 $top = all('SELECT c.title,COUNT(e.id) n,(SELECT COALESCE(SUM(amount),0) FROM payments p WHERE p.course_id=c.id) rev FROM courses c LEFT JOIN enrollments e ON e.course_id=c.id GROUP BY c.id ORDER BY n DESC LIMIT 10');
 ?>
 <div class="card"><h3>Income vs expenses (6 months)</h3>
@@ -21,5 +22,6 @@ $top = all('SELECT c.title,COUNT(e.id) n,(SELECT COALESCE(SUM(amount),0) FROM pa
 <div class="list"><?php foreach (array_reverse($months, true) as $m => [$in, $ex, $n]): ?>
   <div class="row"><div class="grow"><b><?= date('F Y', strtotime("$m-01")) ?></b><small><?= $n ?> new enrollments · in <?= money($in) ?> · out <?= money($ex) ?></small></div><b class="<?= $in - $ex >= 0 ? 'pos' : 'neg' ?>"><?= money($in - $ex) ?></b></div>
 <?php endforeach ?></div>
+<?php if ($ecat): ?><h2>Expenses by category (6 months)</h2><div class="list"><?php foreach ($ecat as $x): ?><div class="row"><span class="mi"><?= $x['icon'] ?></span><b class="grow"><?= e($x['name']) ?></b><b class="neg"><?= money($x['t']) ?></b></div><?php endforeach ?></div><?php endif ?>
 <h2>Courses</h2>
 <div class="list"><?php foreach ($top as $t): ?><div class="row"><div class="grow"><b><?= e($t['title']) ?></b><small><?= $t['n'] ?> students</small></div><b><?= money($t['rev']) ?></b></div><?php endforeach ?></div>

@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '1.5.0';
-const DB_VERSION = 4;
+const APP_VERSION = '1.6.0';
+const DB_VERSION = 5;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -82,6 +82,12 @@ function migrate() {
     foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__ . '/schema.sql')))) as $sql) db()->exec($sql);
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='courses' AND COLUMN_NAME='cover'"))
         db()->exec("ALTER TABLE courses ADD cover VARCHAR(120) DEFAULT ''");
+    foreach (['category_id' => 'INT NULL', 'recurring_id' => 'INT NULL', 'note' => "VARCHAR(255) DEFAULT ''"] as $col => $def)
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='expenses' AND COLUMN_NAME=?", [$col]))
+            db()->exec("ALTER TABLE expenses ADD $col $def");
+    if (!val('SELECT COUNT(*) FROM expense_categories'))
+        foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
+            q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
     q('REPLACE INTO settings(k,v) VALUES("db_version",?)', [DB_VERSION]);
 }
 
@@ -132,3 +138,27 @@ function teacher_profile(int $uid): array {
 function photo_url(string $f): string { return $f ? '?p=cover&f=' . rawurlencode($f) : ''; }
 function csv_list(?string $s): array { return array_values(array_filter(array_map('trim', explode(',', (string)$s)))); }
 function safe_url(string $u): string { return preg_match('~^https?://~i', $u) ? $u : ($u ? 'https://' . ltrim($u, '/') : ''); }
+
+// Post every due recurring expense (catches up missed periods). Called on admin page loads.
+function run_recurring(): int {
+    $n = 0; $today = date('Y-m-d');
+    foreach (all('SELECT * FROM recurring_expenses WHERE active=1 AND next_date<=?', [$today]) as $r) {
+        $d = $r['next_date']; $guard = 0;
+        while ($d <= $today && $guard++ < 60) {
+            if (!val('SELECT id FROM expenses WHERE recurring_id=? AND spent_on=?', [$r['id'], $d])) {
+                q('INSERT INTO expenses(title,amount,spent_on,category_id,recurring_id,note) VALUES(?,?,?,?,?,?)', [$r['title'], $r['amount'], $d, $r['category_id'], $r['id'], 'Auto (recurring)']);
+                $n++;
+            }
+            $d = next_due($d, $r['frequency']);
+        }
+        q('UPDATE recurring_expenses SET next_date=? WHERE id=?', [$d, $r['id']]);
+    }
+    return $n;
+}
+function next_due(string $d, string $f): string {
+    $t = new DateTime($d);
+    if ($f === 'weekly') $t->modify('+1 week');
+    elseif ($f === 'yearly') $t->modify('+1 year');
+    else { $day = (int)$t->format('d'); $t->modify('first day of next month'); $t->setDate((int)$t->format('Y'), (int)$t->format('m'), min($day, (int)$t->format('t'))); }
+    return $t->format('Y-m-d');
+}

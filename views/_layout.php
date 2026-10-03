@@ -20,7 +20,7 @@ $nav = !$u ? [] : ($u['role'] === 'admin'
     : ($u['role'] === 'teacher'
         ? ['home' => 'Home', 'courses' => 'Courses', 'users' => 'Students', 'more' => 'More']
         : ['home' => 'Home', 'my' => 'My Courses', 'courses' => 'Browse', 'more' => 'More']));
-$active = ['course' => 'courses', 'course_edit' => 'courses', 'lesson' => 'courses', 'lesson_edit' => 'courses', 'quiz' => 'courses', 'quiz_edit' => 'courses', 'user' => 'users', 'user_edit' => 'users', 'enrollments' => 'users', 'expenses' => 'more', 'proofs' => 'fees', 'teachers' => 'more', 'tprofile' => 'more', 'reports' => 'more', 'settings' => 'more', 'profile' => 'more', 'announcements' => 'more'][$page] ?? $page;
+$active = ['course' => 'courses', 'course_edit' => 'courses', 'lesson' => 'courses', 'lesson_edit' => 'courses', 'quiz' => 'courses', 'quiz_edit' => 'courses', 'user' => 'users', 'user_edit' => 'users', 'enrollments' => 'users', 'expenses' => 'more', 'recurring' => 'more', 'expense_cats' => 'more', 'proofs' => 'fees', 'teachers' => 'more', 'tprofile' => 'more', 'reports' => 'more', 'settings' => 'more', 'profile' => 'more', 'announcements' => 'more'][$page] ?? $page;
 if ($u && $u['role'] === 'student' && in_array($page, ['course', 'lesson', 'quiz', 'quiz_result'])) $active = 'my';
 ?><!doctype html>
 <html lang="en"><head>
