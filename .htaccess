@@ -1,7 +1,7 @@
 Options -Indexes
 DirectoryIndex index.php
 
-<FilesMatch "\.(sql|md|gitignore)$">
+<FilesMatch "\.(sql|gitignore)$|^README\.md$">
   Require all denied
 </FilesMatch>
 <IfModule mod_rewrite.c>
@@ -9,6 +9,12 @@ DirectoryIndex index.php
   RewriteRule ^(inc|views)/ - [F,L]
   RewriteCond %{HTTPS} !=on
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  RewriteRule ^blog/?$ index.php?p=blog [QSA,L]
+  RewriteRule ^blog/([a-z0-9-]+)/?$ index.php?p=post&slug=$1 [QSA,L]
+  RewriteRule ^(about|privacy-policy|terms|disclaimer|contact)/?$ index.php?p=page&slug=$1 [QSA,L]
+  RewriteRule ^sitemap\.xml$ index.php?p=sitemap [L]
+  RewriteRule ^robots\.txt$ index.php?p=robots [L]
+  RewriteRule ^ads\.txt$ index.php?p=adstxt [L]
 </IfModule>
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"

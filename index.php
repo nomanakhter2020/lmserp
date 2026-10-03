@@ -23,6 +23,13 @@ if ($isPost) {
             q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,"student")', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT)]);
             $_SESSION['uid'] = db()->lastInsertId(); redirect('./');
     }
+    if ($a === 'contact_send') {
+        if (post('website') !== '' || (time() - ($_SESSION['last_contact'] ?? 0)) < 30) { flash('Please wait a moment before sending another message.', 'err'); redirect('contact'); }
+        if (post('name') === '' || post('message') === '' || (post('email') === '' && post('phone') === '')) { flash('Please enter your name, message and an email or phone.', 'err'); redirect('contact'); }
+        q('INSERT INTO contact_messages(name,email,phone,subject,message) VALUES(?,?,?,?,?)', [mb_substr(post('name'), 0, 120), mb_substr(post('email'), 0, 160), mb_substr(post('phone'), 0, 40), mb_substr(post('subject'), 0, 200), mb_substr(post('message'), 0, 3000)]);
+        $_SESSION['last_contact'] = time();
+        flash('Thank you! Your message has been sent. We will reply soon.'); redirect('contact');
+    }
     require_login();
     $me = user();
     switch ($a) {
@@ -184,13 +191,41 @@ if ($isPost) {
             $errs = array_unique($GLOBALS['demo_err'] ?? []);
             flash("Demo loaded: $nt teachers, $nc courses, $np photos, $nv course covers." . ($errs ? ' Image download problem: ' . implode('; ', $errs) : ''), $errs ? 'warn' : 'ok');
             redirect('?p=users&role=teacher');
+        case 'post_save':
+            require_role('admin', 'teacher');
+            $old = $id ? one('SELECT * FROM posts WHERE id=?', [$id]) : null;
+            if ($id && (!$old || (!role('admin') && (int)$old['author_id'] !== (int)$me['id']))) exit('Not allowed');
+            $slug = slugify(post('slug') ?: post('title')); $base = $slug; $n = 2;
+            while (val('SELECT id FROM posts WHERE slug=? AND id<>?', [$slug, $id])) $slug = $base . '-' . $n++;
+            try { $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=post_edit' . ($id ? "&id=$id" : '')); }
+            $excerpt = post('excerpt') ?: mb_strimwidth(trim(preg_replace('/\s+/', ' ', preg_replace('/[#*>\[\]()-]+/', ' ', post('content')))), 0, 155, '…');
+            $data = [post('title'), $slug, post('category') ?: 'General', $excerpt, post('content'), post('published') ? 1 : 0];
+            if ($id) q('UPDATE posts SET title=?,slug=?,category=?,excerpt=?,content=?,published=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO posts(title,slug,category,excerpt,content,published,author_id) VALUES(?,?,?,?,?,?,?)', [...$data, $me['id']]); $id = (int)db()->lastInsertId(); }
+            if ($cover) { if ($old && $old['cover']) @unlink(UPLOAD_DIR . '/covers/' . basename($old['cover'])); q('UPDATE posts SET cover=? WHERE id=?', [$cover, $id]); }
+            flash('Article saved'); redirect("?p=post_edit&id=$id");
+        case 'post_delete':
+            $old = one('SELECT * FROM posts WHERE id=?', [$id]);
+            if (!$old || (!role('admin') && (int)$old['author_id'] !== (int)$me['id'])) exit('Not allowed');
+            q('DELETE FROM posts WHERE id=?', [$id]); flash('Article deleted'); redirect('?p=posts');
+        case 'page_save':
+            require_role('admin');
+            if (isset(LEGAL_PAGES[post('slug')])) q('REPLACE INTO settings(k,v) VALUES(?,?)', ['page_' . post('slug'), (string)($_POST['content'] ?? '')]);
+            flash('Page saved'); redirect('?p=pages_edit' . (post('content') !== '' ? '&slug=' . post('slug') : ''));
+        case 'msg_delete':
+            require_role('admin'); q('DELETE FROM contact_messages WHERE id=?', [$id]); redirect('?p=messages');
+        case 'blog_seed':
+            require_role('admin');
+            require __DIR__ . '/inc/blog_seed.php';
+            $n = blog_seed();
+            flash("$n starter articles added to the blog"); redirect('?p=posts');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
         case 'settings_save':
             require_role('admin');
-            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
+            foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
             $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
@@ -244,6 +279,19 @@ if ($p === 'proof_file') {
     readfile($path); exit;
 }
 if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
+if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
+if ($p === 'robots') { header('Content-Type: text/plain'); echo "User-agent: *\nAllow: /\nDisallow: /install.php\nDisallow: /*?p=login\nDisallow: /*?p=register\n\nSitemap: " . abs_url('sitemap.xml') . "\n"; exit; }
+if ($p === 'adstxt') { header('Content-Type: text/plain'); $c = adsense_client(); echo $c ? 'google.com, ' . str_replace('ca-', '', $c) . ", DIRECT, f08c47fec0942fa0\n" : "# AdSense publisher ID not set yet\n"; exit; }
+if ($p === 'sitemap') {
+    header('Content-Type: application/xml; charset=utf-8');
+    $u = [[abs_url(), date('Y-m-d'), '1.0'], [abs_url('blog'), date('Y-m-d'), '0.9']];
+    foreach (all('SELECT slug,updated_at,created_at FROM posts WHERE published=1 ORDER BY created_at DESC') as $r) $u[] = [abs_url('blog/' . $r['slug']), substr($r['updated_at'] ?: $r['created_at'], 0, 10), '0.8'];
+    foreach (array_keys(LEGAL_PAGES) as $k) $u[] = [abs_url($k), date('Y-m-d'), '0.4'];
+    foreach (all('SELECT u.id FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.active=1 AND tp.public=1') as $r) $u[] = [abs_url('?p=teacher&id=' . $r['id']), date('Y-m-d'), '0.6'];
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
+    foreach ($u as [$l, $d, $pr]) echo '<url><loc>' . htmlspecialchars($l, ENT_XML1) . "</loc><lastmod>$d</lastmod><priority>$pr</priority></url>\n";
+    echo '</urlset>'; exit;
+}
 // Public website: guests landing on the root URL, or anyone via ?p=site
 if (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site') { require __DIR__ . '/views/landing.php'; exit; }
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }

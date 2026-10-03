@@ -23,6 +23,7 @@ $photo = photo_url($pr['photo']);
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=<?= APP_VERSION ?>"><link rel="stylesheet" href="assets/cv.css?v=<?= APP_VERSION ?>">
+<?= ads_head() ?>
 </head><body class="cvpage">
 <header class="nav scrolled"><div class="container nav-in">
   <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>

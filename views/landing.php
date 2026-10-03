@@ -26,13 +26,14 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=<?= APP_VERSION ?>"><link rel="stylesheet" href="assets/cv.css?v=<?= APP_VERSION ?>">
+<?= ads_head() ?>
 </head><body>
 
 <header class="nav" id="top">
   <div class="container nav-in">
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
-      <a href="#courses">Courses</a><?php if ($teachers): ?><a href="#teachers">Teachers</a><?php endif ?><a href="#why">Why us</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#contact">Contact</a>
+      <a href="#courses">Courses</a><?php if ($teachers): ?><a href="#teachers">Teachers</a><?php endif ?><a href="#why">Why us</a><a href="#how">How it works</a><a href="blog">Blog</a><a href="about">About</a><a href="contact">Contact</a>
       <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a>
       <?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>"><?= $canReg ? 'Enroll now' : 'Log in' ?></a><?php endif ?>
     </nav>
@@ -160,13 +161,19 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   </div>
 </section>
 
-<footer class="foot"><div class="container foot-in">
-  <a class="brand" href="#top"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
-  <nav><a href="#courses">Courses</a><a href="#faq">FAQ</a><a href="#contact">Contact</a><a href="?p=<?= $me ? 'home' : 'login' ?>"><?= $me ? 'My dashboard' : 'Student login' ?></a></nav>
-  <small>© <?= date('Y') ?> <?= e($inst) ?>. All rights reserved.</small>
-</div></footer>
-
-<?php if ($wa): ?><a class="wa-float" href="https://wa.me/<?= $wa ?>" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 32 32" width="30" height="30" fill="#fff"><path d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3zm0 23.7c-2 0-4-.6-5.7-1.6l-.4-.2-3.9 1 1-3.8-.3-.4A10.7 10.7 0 1 1 16 26.7zm5.9-8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2l-1 1.2c-.2.2-.4.2-.7.1a8.8 8.8 0 0 1-4.4-3.8c-.3-.6.3-.5.9-1.7.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.8s1.2 3.3 1.4 3.5c.2.2 2.4 3.6 5.7 5 2.1.9 3 1 4 .8.7-.1 1.9-.8 2.2-1.5.3-.7.3-1.3.2-1.5l-.7-.3z"/></svg></a><?php endif ?>
+<?php $latest = all('SELECT * FROM posts WHERE published=1 ORDER BY created_at DESC LIMIT 3'); if ($latest): ?>
+<section id="blog" class="sec alt">
+  <div class="container">
+    <div class="sec-head"><span class="kicker">From our blog</span><h2>Free study guides &amp; tips</h2><p>Practical articles from our teachers to help you study smarter.</p></div>
+    <div class="bgrid"><?php foreach ($latest as $bp): ?>
+      <a class="bcard" href="<?= e(post_url($bp)) ?>"><div class="bimg" style="<?= $bp['cover'] ? "background-image:url('" . e(photo_url($bp['cover'])) . "')" : '' ?>"><?php if (!$bp['cover']): ?><span><?= e(mb_substr($bp['title'], 0, 1)) ?></span><?php endif ?></div>
+        <div class="bbody"><span class="bcat"><?= e($bp['category']) ?></span><h2><?= e($bp['title']) ?></h2><p><?= e($bp['excerpt']) ?></p><small><?= read_mins((string)$bp['content']) ?> min read</small></div></a>
+    <?php endforeach ?></div>
+    <div class="center" style="margin-top:30px"><a class="btn-o lg" href="blog">Read all articles →</a></div>
+  </div>
+</section>
+<?php endif ?>
+<?php ob_start(); require __DIR__ . '/_site_foot.php'; $__f = ob_get_clean(); echo substr($__f, 0, strrpos($__f, '</body>')); ?>
 
 <script>
 document.querySelectorAll('#menu a').forEach(a=>a.addEventListener('click',()=>document.body.classList.remove('open')));
