@@ -19,7 +19,7 @@ $m = (string)get('m', date('Y-m'));
 $pays = all('SELECT p.*,u.name,c.title FROM payments p JOIN users u ON u.id=p.user_id LEFT JOIN courses c ON c.id=p.course_id WHERE DATE_FORMAT(p.paid_on,"%Y-%m")=? ORDER BY p.paid_on DESC,p.id DESC', [$m]);
 $students = all('SELECT id,name,role FROM users WHERE (role="student" OR (role="teacher" AND id IN (SELECT user_id FROM enrollments))) AND active=1 ORDER BY name');
 $courses = all('SELECT id,title FROM courses ORDER BY title');
-$dues = all('SELECT u.id,u.name,u.phone,SUM(COALESCE(e.fee,c.fee)) fee,(SELECT COALESCE(SUM(amount),0) FROM payments p WHERE p.user_id=u.id) paid FROM enrollments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id GROUP BY u.id HAVING fee>paid ORDER BY fee-paid DESC LIMIT 50');
+$dues = all('SELECT u.id,u.name,u.phone,SUM(COALESCE(e.fee,c.fee)) tfee,(SELECT COALESCE(SUM(amount),0) FROM payments p WHERE p.user_id=u.id) paid FROM enrollments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id GROUP BY u.id HAVING tfee>paid ORDER BY tfee-paid DESC LIMIT 50');
 ?>
 <form class="search"><input type="hidden" name="p" value="fees"><input type="month" name="m" value="<?= e($m) ?>" onchange="this.form.submit()"></form>
 <div class="quick"><a href="?p=vouchers">📄 Fee vouchers</a><a href="?p=voucher_gen">＋ Generate vouchers</a><a href="?p=voucher_gen#plans">🔁 Monthly plans</a><a href="?p=proofs">🧾 Proofs</a></div>
@@ -39,5 +39,5 @@ $dues = all('SELECT u.id,u.name,u.phone,SUM(COALESCE(e.fee,c.fee)) fee,(SELECT C
     <form method="post" onsubmit="return confirm('Delete payment?')"><?= csrf_field() ?><input type="hidden" name="a" value="payment_delete"><input type="hidden" name="id" value="<?= $p['id'] ?>"><button class="x">✕</button></form></div>
 <?php endforeach; if (!$pays): ?><p class="empty">No payments this month</p><?php endif ?></div>
 <?php if ($dues): ?><h2>Outstanding dues</h2><div class="list"><?php foreach ($dues as $d): ?>
-  <a class="row" href="?p=user&id=<?= $d['id'] ?>#pay"><div class="grow"><b><?= e($d['name']) ?></b><small><?= e($d['phone']) ?></small></div><b class="neg"><?= money($d['fee'] - $d['paid']) ?></b></a>
+  <a class="row" href="?p=user&id=<?= $d['id'] ?>#pay"><div class="grow"><b><?= e($d['name']) ?></b><small><?= e($d['phone']) ?></small></div><b class="neg"><?= money($d['tfee'] - $d['paid']) ?></b></a>
 <?php endforeach ?></div><?php endif ?>
