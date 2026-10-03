@@ -27,6 +27,7 @@ if (role('admin')):
   <a href="?p=batches">🗓️ Batches</a><a href="?p=course_edit">＋ Course</a><a href="?p=user_edit">＋ Person</a><a href="?p=fees#add">＋ Fee</a><a href="?p=expenses">＋ Expense</a>
 </div>
 <?php if ($np = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')): ?><a class="alert warn" href="?p=proofs" style="display:block">🧾 <?= $np ?> payment proof<?= $np > 1 ? 's' : '' ?> waiting for verification ›</a><?php endif ?>
+<?php if ($odv = one('SELECT COUNT(*) n, COALESCE(SUM(amount-discount+late_fee),0) t FROM fee_vouchers WHERE status="unpaid" AND due_date<CURDATE()')) if ($odv['n']): ?><a class="alert err" href="?p=vouchers&f=overdue" style="display:block">📄 <?= $odv['n'] ?> overdue fee voucher<?= $odv['n'] > 1 ? 's' : '' ?> · <?= money($odv['t']) ?> ›</a><?php endif ?>
 <?php if ($nr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')): ?><a class="alert warn" href="?p=posts&f=pending" style="display:block">✍️ <?= $nr ?> blog article<?= $nr > 1 ? 's' : '' ?> waiting for your approval ›</a><?php endif ?>
 <?php if ($pending): ?>
 <h2>Pending enrollments</h2>
@@ -70,6 +71,7 @@ if (role('admin')):
 ?>
 <?php $attp = att_percent((int)$me['id']); ?>
 <div class="stats"><div class="stat"><b><?= count($cs) ?></b><span>Courses</span></div><div class="stat"><b><?= $done ?></b><span>Lessons done</span></div><div class="stat"><b><?= $avg !== null ? $avg . '%' : '–' ?></b><span>Quiz avg</span></div><?php if ($attp !== null): ?><div class="stat"><b class="<?= $attp < 75 ? 'neg' : 'pos' ?>"><?= $attp ?>%</b><span>Attendance</span></div><?php endif ?></div>
+<?php if ($uvn = one('SELECT COUNT(*) n, SUM(due_date<CURDATE()) od FROM fee_vouchers WHERE user_id=? AND status="unpaid"', [$me['id']])) if ($uvn['n']): ?><a class="alert <?= $uvn['od'] ? 'err' : 'warn' ?>" href="?p=fees" style="display:block">📄 You have <?= $uvn['n'] ?> unpaid fee voucher<?= $uvn['n'] > 1 ? 's' : '' ?><?= $uvn['od'] ? ' (' . $uvn['od'] . ' overdue)' : '' ?> ›</a><?php endif ?>
 <?php require __DIR__ . '/_today.php'; ?>
 <?php if ($cont): $pc = course_progress((int)$me['id'], (int)$cont['id']);
   $nx = val('SELECT l.id FROM lessons l LEFT JOIN progress p ON p.lesson_id=l.id AND p.user_id=? WHERE l.course_id=? AND p.lesson_id IS NULL ORDER BY l.sort,l.id LIMIT 1', [$me['id'], $cont['id']]); ?>

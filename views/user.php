@@ -41,6 +41,21 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
   <select name="status"><option value="active">Active</option><option value="pending">Pending</option></select>
   <button class="btn block">Enroll</button></form></details>
 
+<?php $uv = all('SELECT * FROM fee_vouchers WHERE user_id=? AND status<>"cancelled" ORDER BY due_date DESC LIMIT 24', [$id]); ?>
+<h2 id="vouchers">Fee vouchers</h2>
+<div class="list"><?php foreach ($uv as $v): $od = voucher_overdue($v); ?>
+  <a class="row" href="?p=voucher&id=<?= $v['id'] ?>"><div class="grow"><b><?= e($v['title']) ?></b><small><?= voucher_no($v) ?> · due <?= date('d M Y', strtotime($v['due_date'])) ?></small></div><b class="<?= $v['status'] === 'paid' ? 'pos' : ($od ? 'neg' : '') ?>"><?= money($v['status'] === 'paid' ? $v['paid_amount'] : voucher_total($v)) ?></b><span class="pill <?= $v['status'] === 'paid' ? 'ok' : ($od ? 'err' : 'warn') ?>"><?= $v['status'] === 'paid' ? 'Paid' : ($od ? 'Overdue' : 'Unpaid') ?></span></a>
+<?php endforeach; if (!$uv): ?><p class="empty">No vouchers</p><?php endif ?></div>
+<details class="card"><summary>＋ Create installment plan</summary>
+<form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="installments_create"><input type="hidden" name="user_id" value="<?= $id ?>">
+  <select name="course_id"><option value="">— General —</option><?php foreach ($ens as $e): ?><option value="<?= $e['course_id'] ?>"><?= e($e['title']) ?> (<?= money($e['fee']) ?>)</option><?php endforeach ?></select>
+  <div class="two"><input name="total" type="number" min="1" placeholder="Total amount" required><input name="count" type="number" min="2" max="24" value="3" placeholder="Installments"></div>
+  <div class="two"><label>First due date<input name="first_due" type="date" value="<?= date('Y-m-d') ?>"></label><label>Late fine<input name="late_fee" type="number" min="0" value="0"></label></div>
+  <button class="btn block">Create installments</button></form></details>
+<?php if ($ens): ?><details class="card"><summary>🎓 Scholarship / discount</summary>
+<?php foreach ($ens as $e): ?><form method="post" class="inline" style="margin-bottom:8px"><?= csrf_field() ?><input type="hidden" name="a" value="enroll_discount"><input type="hidden" name="id" value="<?= $e['id'] ?>"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>#vouchers">
+  <span class="grow" style="font-size:14px"><?= e($e['title']) ?></span><input name="discount" type="number" min="0" max="100" value="<?= (int)($e['discount'] ?? 0) ?>" style="width:80px"><span>%</span><button class="btn sm">Save</button></form><?php endforeach ?>
+<p class="muted" style="font-size:12.5px">Applied automatically to new monthly vouchers for that course.</p></details><?php endif ?>
 <h2>Fee payments</h2>
 <details class="card" id="pay"><summary>＋ Record payment</summary>
 <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="payment_add"><input type="hidden" name="user_id" value="<?= $id ?>"><input type="hidden" name="back" value="?p=user&id=<?= $id ?>">

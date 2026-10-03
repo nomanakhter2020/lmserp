@@ -6,7 +6,7 @@ date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
 const APP_VERSION = '2.0.0';
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -92,6 +92,8 @@ function migrate() {
         db()->exec("ALTER TABLE enrollments ADD fee DECIMAL(12,2) NULL");
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='enrollments' AND COLUMN_NAME='discount'"))
         db()->exec("ALTER TABLE enrollments ADD discount TINYINT NOT NULL DEFAULT 0");
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payment_requests' AND COLUMN_NAME='voucher_id'"))
+        db()->exec("ALTER TABLE payment_requests ADD voucher_id INT NULL");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -245,3 +247,35 @@ function att_percent(int $uid, ?int $bid = null): ?int {
     return $r['t'] ? (int)round($r['p'] * 100 / $r['t']) : null;
 }
 function wa_num(string $phone): string { $w = preg_replace('/\D/', '', $phone); return str_starts_with($w, '0') ? '92' . substr($w, 1) : $w; }
+
+/* ---------------- Fee vouchers ---------------- */
+function voucher_overdue(array $v): bool { return $v['status'] === 'unpaid' && $v['due_date'] < date('Y-m-d'); }
+function voucher_total(array $v): float { return max(0, (float)$v['amount'] - (float)$v['discount'] + (voucher_overdue($v) ? (float)$v['late_fee'] : 0)); }
+function voucher_no(array $v): string { return 'FV-' . str_pad((string)$v['id'], 6, '0', STR_PAD_LEFT); }
+function create_voucher(int $uid, ?int $cid, string $title, float $amount, string $due, float $late = 0, ?int $plan = null, string $period = '', ?float $disc = null): int {
+    if ($disc === null) { $pct = $cid ? (int)val('SELECT discount FROM enrollments WHERE user_id=? AND course_id=?', [$uid, $cid]) : 0; $disc = round($amount * $pct / 100); }
+    q('INSERT INTO fee_vouchers(user_id,course_id,title,amount,discount,late_fee,due_date,plan_id,period) VALUES(?,?,?,?,?,?,?,?,?)', [$uid, $cid, $title, $amount, $disc, $late, $due, $plan, $period]);
+    return (int)db()->lastInsertId();
+}
+// Monthly fee plans: create this month's vouchers for every active student of the course
+function run_fee_plans(): int {
+    $n = 0; $period = date('Y-m'); $day = (int)date('j');
+    foreach (all('SELECT p.*,c.title FROM fee_plans p JOIN courses c ON c.id=p.course_id WHERE p.active=1 AND p.last_period<>? AND p.generate_day<=?', [$period, $day]) as $p) {
+        $due = $period . '-' . str_pad((string)min((int)$p['due_day'], (int)date('t')), 2, '0', STR_PAD_LEFT);
+        foreach (all('SELECT user_id FROM enrollments WHERE course_id=? AND status IN ("active","completed")', [$p['course_id']]) as $e) {
+            if (val('SELECT id FROM fee_vouchers WHERE user_id=? AND plan_id=? AND period=?', [$e['user_id'], $p['id'], $period])) continue;
+            create_voucher((int)$e['user_id'], (int)$p['course_id'], $p['title'] . ' — ' . date('F Y'), (float)$p['amount'], $due, (float)$p['late_fee'], (int)$p['id'], $period); $n++;
+        }
+        q('UPDATE fee_plans SET last_period=? WHERE id=?', [$period, $p['id']]);
+    }
+    return $n;
+}
+function pay_voucher(int $vid, float $amount, string $method, string $date, string $note = ''): int {
+    $v = one('SELECT * FROM fee_vouchers WHERE id=?', [$vid]);
+    if (!$v || $v['status'] !== 'unpaid') return 0;
+    q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$v['user_id'], $v['course_id'], $amount, $method, trim(voucher_no($v) . ' ' . $v['title'] . ($note ? " · $note" : '')), $date, user()['id'] ?? null]);
+    $pid = (int)db()->lastInsertId();
+    q('UPDATE fee_vouchers SET status="paid",paid_amount=?,paid_on=?,payment_id=? WHERE id=?', [$amount, $date, $pid, $vid]);
+    if ($v['course_id']) q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [$v['user_id'], $v['course_id']]);
+    return $pid;
+}

@@ -119,21 +119,28 @@ if ($isPost) {
             if (post('activate') && (int)post('course_id')) q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [(int)post('user_id'), (int)post('course_id')]);
             flash('Payment recorded'); redirect(post('back', '?p=fees'));
         case 'proof_submit':
-            $c = one('SELECT * FROM courses WHERE id=?', [$id]);
-            $en = $c ? one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]) : null;
+            $vch = post('voucher_id') ? one('SELECT * FROM fee_vouchers WHERE id=? AND user_id=? AND status="unpaid"', [(int)post('voucher_id'), $me['id']]) : null;
+            if ($vch) $id = (int)$vch['course_id'];
+            $c = one('SELECT * FROM courses WHERE id=?', [$id]) ?: ($vch ? ['id' => 0, 'fee' => voucher_total($vch)] : null);
+            $en = $c && $c['id'] ? one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]) : ($vch ? ['ok' => 1] : null);
             if (!$en) redirect('?p=courses');
+            $back = $vch ? '?p=voucher&id=' . $vch['id'] : "?p=course&id=$id";
             $method = in_array(post('method'), ['Bank', 'JazzCash', 'EasyPaisa', 'Cash'], true) ? post('method') : 'Bank';
-            try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=course&id=$id"); }
-            if ($method !== 'Cash' && !$proof && post('txn_ref') === '') { flash('Upload a screenshot or enter the transaction ID', 'err'); redirect("?p=course&id=$id"); }
-            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note) VALUES(?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', course_fee_for($c)), $method, post('txn_ref'), $proof, post('note')]);
-            flash($method === 'Cash' ? 'Noted. Pay cash at the office; admin will unlock the course.' : 'Payment proof sent. You will get access once the admin verifies it.');
-            redirect("?p=course&id=$id");
+            try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect($back); }
+            if ($method !== 'Cash' && !$proof && post('txn_ref') === '') { flash('Upload a screenshot or enter the transaction ID', 'err'); redirect($back); }
+            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note,voucher_id) VALUES(?,?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', $vch ? voucher_total($vch) : course_fee_for($c)), $method, post('txn_ref'), $proof, post('note'), $vch['id'] ?? null]);
+            flash($method === 'Cash' ? 'Noted. Pay cash at the office; admin will confirm it.' : 'Payment proof sent. The admin will verify it shortly.');
+            redirect($back);
         case 'proof_review':
             require_role('admin');
             $r = one('SELECT * FROM payment_requests WHERE id=? AND status="pending"', [$id]);
             if (!$r) redirect('?p=proofs');
             if (post('decision') === 'approve') {
                 $amt = (float)post('amount', $r['amount']);
+                if ($r['voucher_id'] && ($pid = pay_voucher((int)$r['voucher_id'], $amt, $r['method'], date('Y-m-d'), $r['txn_ref'] ? 'Ref ' . $r['txn_ref'] : 'Online proof'))) {
+                    q('UPDATE payment_requests SET status="approved",amount=?,payment_id=?,admin_note=? WHERE id=?', [$amt, $pid, post('admin_note'), $id]);
+                    flash('Approved — voucher marked paid'); redirect('?p=proofs');
+                }
                 q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$r['user_id'], $r['course_id'], $amt, $r['method'], ($r['txn_ref'] ? 'Ref ' . $r['txn_ref'] : ($r['method'] === 'Cash' ? 'Cash at office' : 'Online proof')), date('Y-m-d'), $me['id']]);
                 $pid = db()->lastInsertId();
                 q('UPDATE payment_requests SET status="approved",amount=?,payment_id=?,admin_note=? WHERE id=?', [$amt, $pid, post('admin_note'), $id]);
@@ -257,6 +264,43 @@ if ($isPost) {
                 q('REPLACE INTO attendance(batch_id,user_id,att_date,status,marked_by) VALUES(?,?,?,?,?)', [$id, (int)$uid, $d, $st, $me['id']]); $n++;
             }
             flash("Attendance saved for $n students"); redirect("?p=attendance&id=$id&date=$d&saved=1");
+        case 'plan_save':
+            require_role('admin');
+            $data = [(int)post('course_id'), (float)post('amount'), max(1, min(28, (int)post('due_day', 10))), (float)post('late_fee'), max(1, min(28, (int)post('generate_day', 1))), post('active') ? 1 : 0];
+            if ($id) q('UPDATE fee_plans SET course_id=?,amount=?,due_day=?,late_fee=?,generate_day=?,active=? WHERE id=?', [...$data, $id]);
+            else q('INSERT INTO fee_plans(course_id,amount,due_day,late_fee,generate_day,active) VALUES(?,?,?,?,?,?)', $data);
+            $n = run_fee_plans(); flash('Monthly fee plan saved' . ($n ? " · $n vouchers generated for " . date('F') : '')); redirect('?p=voucher_gen');
+        case 'plan_delete':
+            require_role('admin'); q('DELETE FROM fee_plans WHERE id=?', [$id]); flash('Plan removed (existing vouchers kept)'); redirect('?p=voucher_gen');
+        case 'voucher_generate':
+            require_role('admin');
+            $cid = (int)post('course_id'); $n = 0;
+            $uids = post('batch_id') ? array_column(all('SELECT user_id FROM batch_students WHERE batch_id=?', [(int)post('batch_id')]), 'user_id') : array_column(all('SELECT user_id FROM enrollments WHERE course_id=? AND status IN ("active","completed","pending")', [$cid]), 'user_id');
+            foreach ($uids as $uid) { if (val('SELECT id FROM fee_vouchers WHERE user_id=? AND title=? AND status<>"cancelled"', [$uid, post('title')])) continue; create_voucher((int)$uid, $cid ?: null, post('title'), (float)post('amount'), post('due_date'), (float)post('late_fee')); $n++; }
+            flash("$n vouchers generated"); redirect('?p=vouchers');
+        case 'installments_create':
+            require_role('admin');
+            $uid = (int)post('user_id'); $cid = (int)post('course_id') ?: null; $cnt = max(1, min(24, (int)post('count'))); $total = (float)post('total');
+            $each = floor($total / $cnt); $d = new DateTime(post('first_due') ?: date('Y-m-d'));
+            for ($i = 1; $i <= $cnt; $i++) {
+                $amt = $i === $cnt ? $total - $each * ($cnt - 1) : $each;
+                create_voucher($uid, $cid, 'Installment ' . $i . '/' . $cnt . ($cid ? ' — ' . val('SELECT title FROM courses WHERE id=?', [$cid]) : ''), $amt, $d->format('Y-m-d'), (float)post('late_fee'), null, '', 0);
+                $d->modify('+1 month');
+            }
+            flash("$cnt installment vouchers created"); redirect("?p=user&id=$uid#vouchers");
+        case 'voucher_pay':
+            require_role('admin');
+            $v = one('SELECT * FROM fee_vouchers WHERE id=?', [$id]);
+            $pid = pay_voucher($id, (float)post('amount', $v ? voucher_total($v) : 0), post('method', 'Cash'), post('paid_on', date('Y-m-d')), post('note'));
+            flash($pid ? 'Voucher marked paid' : 'Voucher already paid', $pid ? 'ok' : 'err'); redirect(post('back', "?p=voucher&id=$id"));
+        case 'voucher_cancel':
+            require_role('admin'); q('UPDATE fee_vouchers SET status="cancelled" WHERE id=? AND status="unpaid"', [$id]); flash('Voucher cancelled'); redirect(post('back', '?p=vouchers'));
+        case 'voucher_edit':
+            require_role('admin'); q('UPDATE fee_vouchers SET amount=?,discount=?,late_fee=?,due_date=? WHERE id=? AND status="unpaid"', [(float)post('amount'), (float)post('discount'), (float)post('late_fee'), post('due_date'), $id]);
+            flash('Voucher updated'); redirect("?p=voucher&id=$id");
+        case 'enroll_discount':
+            require_role('admin'); q('UPDATE enrollments SET discount=? WHERE id=?', [max(0, min(100, (int)post('discount'))), $id]);
+            flash('Scholarship / discount saved (applies to new vouchers)'); redirect(post('back', '?p=enrollments'));
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
@@ -336,7 +380,7 @@ if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
 if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register'], true)) require_login();
 
-if (role('admin')) run_recurring();
+if (role('admin')) { run_recurring(); run_fee_plans(); }
 $view = __DIR__ . "/views/$p.php";
 $page = $p;
 if (!is_file($view)) { $p = $page = "home"; $view = __DIR__ . "/views/home.php"; }
