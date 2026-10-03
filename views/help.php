@@ -24,6 +24,7 @@ $G = [
  ]],
  'student' => ['🎒 Student guide', [
    ['Join a course', ["Browse → open a course → Enroll.", "For paid courses, pay using the account details shown and upload the screenshot.", "Your course unlocks once the payment is verified."]],
+   ['Fingerprint login', ["Log in once with your password on your phone.", "More → Fingerprint login → Enable on this phone, and confirm with your finger or face.", "Next time tap 'Login with fingerprint' on the login screen."]],
    ['Learn', ["My Courses → open a course → tap a lesson to watch the video and read notes.", "Tap Complete & next to move forward and track your progress.", "Take quizzes at the end — you can retry."]],
    ['Homework & results', ["More → Assignments: submit your answer or upload a photo of your notebook.", "More → Results: see your result cards when published."]],
    ['Fees, shop & certificate', ["More → My fees: pay vouchers and download receipts.", "Shop: buy task books and materials — pay cash on delivery or online.", "Finish all lessons and pass quizzes to get your certificate 🎓."]],

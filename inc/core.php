@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.5.1';
-const DB_VERSION = 15;
+const APP_VERSION = '2.6.0';
+const DB_VERSION = 16;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 

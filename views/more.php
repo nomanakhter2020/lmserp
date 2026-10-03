@@ -23,6 +23,7 @@ $items = [
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
   ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
+  ['biometric', '👆', 'Fingerprint login', true],
   ['help', '❓', 'Help & guides', true],
   ['site', '🌐', 'Website', true],
   ['profile', '👤', 'My profile', true],

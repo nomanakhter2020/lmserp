@@ -4,6 +4,11 @@ $back = '';
 ob_start();
 require $view;
 $body = ob_get_clean();
+if ($page === 'home') $body = <<<'BIO'
+<div class="card" id="bioAsk" hidden style="gap:10px;align-items:center"><span style="font-size:28px">👆</span><div class="grow"><b>Login with fingerprint?</b><br><small class="muted">Next time, open the app with one touch.</small></div><a class="btn sm" href="?p=biometric">Enable</a><button class="btn sm ghost" onclick="try{localStorage.setItem('bio_skip','1')}catch(e){};this.parentNode.remove()">✕</button></div>
+<script src="assets/bio.js?v=2"></script>
+<script>(async()=>{let s=null;try{s=localStorage.getItem('bio_skip')}catch(e){}if(s||Bio.on()||!(await Bio.supported()))return;const c=document.getElementById('bioAsk');c.hidden=false;})()</script>
+BIO . $body;
 $u = user();
 $inst = setting('institute', APP_NAME);
 $icons = [

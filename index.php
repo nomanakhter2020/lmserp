@@ -7,6 +7,7 @@ migrate();
 $p = preg_replace('/[^a-z_]/', '', (string)get('p', 'home'));
 $id = (int)($_POST['id'] ?? get('id', 0));
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
+if ($p === 'webauthn' && $isPost) { require __DIR__ . '/inc/webauthn.php'; }
 
 /* ------------------------- ACTIONS (POST) ------------------------- */
 if ($isPost) {
