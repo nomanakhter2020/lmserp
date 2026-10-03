@@ -1,6 +1,8 @@
 <?php
 $me = user(); $title = role('admin') ? 'Fees' : 'My fees';
 if (!role('admin')) {
+    $kid = child_id(); if (role('parent')) { $kn = val('SELECT name FROM users WHERE id=?', [$kid]); $title = 'Fees · ' . $kn; $kids = my_children(); if (count($kids) > 1): ?><div class="chips"><?php foreach ($kids as $k): ?><a href="?p=fees&child=<?= $k['id'] ?>" class="<?= $k['id'] == $kid ? 'on' : '' ?>"><?= e($k['name']) ?></a><?php endforeach ?></div><?php endif; }
+    $me = ['id' => $kid] + $me;
     $pays = all('SELECT p.*,c.title FROM payments p LEFT JOIN courses c ON c.id=p.course_id WHERE p.user_id=? ORDER BY p.paid_on DESC', [$me['id']]);
     $fee = (float)val('SELECT COALESCE(SUM(COALESCE(e.fee,c.fee)),0) FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=?', [$me['id']]);
     $paid = array_sum(array_column($pays, 'amount')); ?>

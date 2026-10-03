@@ -66,7 +66,7 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
   <?php endif ?>
 <?php endif ?>
 <?php if ($manage): ?>
-<div class="quick"><a href="?p=course_edit&id=<?= $id ?>">✏️ Edit</a><a href="?p=lesson_edit&course=<?= $id ?>">＋ Lesson</a><a href="?p=quiz_edit&course=<?= $id ?>">＋ Quiz</a><a href="?p=enrollments&course=<?= $id ?>">👥 Students</a><a href="?p=batch_edit&course=<?= $id ?>">🗓️ New batch</a></div>
+<div class="quick"><a href="?p=course_edit&id=<?= $id ?>">✏️ Edit</a><a href="?p=lesson_edit&course=<?= $id ?>">＋ Lesson</a><a href="?p=quiz_edit&course=<?= $id ?>">＋ Quiz</a><a href="?p=enrollments&course=<?= $id ?>">👥 Students</a><a href="?p=batch_edit&course=<?= $id ?>">🗓️ New batch</a><a href="?p=assign_edit&course=<?= $id ?>">📝 Assignment</a><a href="?p=exam_edit&course=<?= $id ?>">🧾 Exam</a></div>
 <?php endif ?>
 
 <h2>Lessons</h2>

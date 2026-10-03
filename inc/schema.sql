@@ -278,3 +278,108 @@ CREATE TABLE IF NOT EXISTS certificates (
   revoked TINYINT(1) NOT NULL DEFAULT 0,
   UNIQUE KEY uc (user_id, course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  body VARCHAR(500) DEFAULT '',
+  link VARCHAR(255) DEFAULT '',
+  icon VARCHAR(10) DEFAULT '🔔',
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(user_id, is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS assignments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  batch_id INT NULL,
+  title VARCHAR(200) NOT NULL,
+  instructions TEXT,
+  attachment_url VARCHAR(500) DEFAULT '',
+  due_at DATETIME NULL,
+  max_marks INT NOT NULL DEFAULT 10,
+  created_by INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS submissions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  assignment_id INT NOT NULL,
+  user_id INT NOT NULL,
+  answer TEXT,
+  file VARCHAR(120) DEFAULT '',
+  submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  marks DECIMAL(6,2) NULL,
+  feedback VARCHAR(1000) DEFAULT '',
+  graded_at DATETIME NULL,
+  graded_by INT NULL,
+  UNIQUE KEY ua (assignment_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS exams (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  batch_id INT NULL,
+  title VARCHAR(160) NOT NULL,
+  exam_date DATE NULL,
+  published TINYINT(1) NOT NULL DEFAULT 0,
+  remarks_note VARCHAR(255) DEFAULT '',
+  created_by INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX(course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS exam_papers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  exam_id INT NOT NULL,
+  subject VARCHAR(120) NOT NULL,
+  max_marks INT NOT NULL DEFAULT 100,
+  pass_marks INT NOT NULL DEFAULT 33,
+  sort INT NOT NULL DEFAULT 0,
+  INDEX(exam_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS exam_marks (
+  paper_id INT NOT NULL,
+  user_id INT NOT NULL,
+  marks DECIMAL(6,2) NULL,
+  absent TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (paper_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS salary_rules (
+  user_id INT PRIMARY KEY,
+  type ENUM('fixed','per_student','percent') NOT NULL DEFAULT 'fixed',
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS salary_slips (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  period VARCHAR(7) NOT NULL,
+  basic DECIMAL(12,2) NOT NULL DEFAULT 0,
+  bonus DECIMAL(12,2) NOT NULL DEFAULT 0,
+  deduction DECIMAL(12,2) NOT NULL DEFAULT 0,
+  net DECIMAL(12,2) NOT NULL DEFAULT 0,
+  basis VARCHAR(255) DEFAULT '',
+  status ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid',
+  paid_on DATE NULL,
+  method VARCHAR(40) DEFAULT '',
+  expense_id INT NULL,
+  note VARCHAR(255) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY up (user_id, period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS parent_links (
+  parent_id INT NOT NULL,
+  student_id INT NOT NULL,
+  relation VARCHAR(40) DEFAULT 'Parent',
+  PRIMARY KEY (parent_id, student_id),
+  INDEX(student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

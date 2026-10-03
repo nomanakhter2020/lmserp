@@ -5,8 +5,8 @@ session_start();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.0.0';
-const DB_VERSION = 10;
+const APP_VERSION = '2.1.0';
+const DB_VERSION = 11;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -94,6 +94,8 @@ function migrate() {
         db()->exec("ALTER TABLE enrollments ADD discount TINYINT NOT NULL DEFAULT 0");
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payment_requests' AND COLUMN_NAME='voucher_id'"))
         db()->exec("ALTER TABLE payment_requests ADD voucher_id INT NULL");
+    if (!str_contains((string)val("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='role'"), 'parent'))
+        db()->exec("ALTER TABLE users MODIFY role ENUM('admin','teacher','student','parent') NOT NULL DEFAULT 'student'");
     if (!val('SELECT COUNT(*) FROM expense_categories'))
         foreach ([['Rent', '🏢'], ['Salaries', '👥'], ['Utilities', '💡'], ['Internet & Phone', '📶'], ['Marketing & Ads', '📣'], ['Stationery', '📚'], ['Maintenance', '🛠️'], ['Software', '💻'], ['Transport', '🚗'], ['Other', '💸']] as [$n, $i])
             q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [$n, $i]);
@@ -255,7 +257,9 @@ function voucher_no(array $v): string { return 'FV-' . str_pad((string)$v['id'],
 function create_voucher(int $uid, ?int $cid, string $title, float $amount, string $due, float $late = 0, ?int $plan = null, string $period = '', ?float $disc = null): int {
     if ($disc === null) { $pct = $cid ? (int)val('SELECT discount FROM enrollments WHERE user_id=? AND course_id=?', [$uid, $cid]) : 0; $disc = round($amount * $pct / 100); }
     q('INSERT INTO fee_vouchers(user_id,course_id,title,amount,discount,late_fee,due_date,plan_id,period) VALUES(?,?,?,?,?,?,?,?,?)', [$uid, $cid, $title, $amount, $disc, $late, $due, $plan, $period]);
-    return (int)db()->lastInsertId();
+    $vid = (int)db()->lastInsertId();
+    notify($uid, 'New fee voucher: ' . $title, money(max(0, $amount - $disc)) . ' due ' . date('d M Y', strtotime($due)), "?p=voucher&id=$vid", '📄', true);
+    return $vid;
 }
 // Monthly fee plans: create this month's vouchers for every active student of the course
 function run_fee_plans(): int {
@@ -300,4 +304,60 @@ function issue_certificate(int $uid, int $cid, ?string $grade = null): string {
     q('INSERT INTO certificates(user_id,course_id,code,grade,issued_by) VALUES(?,?,?,?,?)', [$uid, $cid, $code, $grade ?? cert_grade($uid, $cid), user()['id'] ?? null]);
     q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$uid, $cid]);
     return $code;
+}
+
+/* ---------------- Notifications ---------------- */
+function notify($uids, string $title, string $body = '', string $link = '', string $icon = '🔔', bool $parents = false): void {
+    $uids = array_unique(array_filter(array_map('intval', (array)$uids)));
+    if ($parents && $uids) $uids = array_unique(array_merge($uids, array_map('intval', array_column(all('SELECT parent_id FROM parent_links WHERE student_id IN (' . implode(',', $uids) . ')'), 'parent_id'))));
+    foreach ($uids as $u) q('INSERT INTO notifications(user_id,title,body,link,icon) VALUES(?,?,?,?,?)', [$u, mb_substr($title, 0, 200), mb_substr($body, 0, 500), $link, $icon]);
+}
+function course_student_ids(int $cid, ?int $bid = null): array {
+    return array_map('intval', array_column($bid ? all('SELECT user_id FROM batch_students WHERE batch_id=?', [$bid]) : all('SELECT user_id FROM enrollments WHERE course_id=? AND status<>"pending"', [$cid]), 'user_id'));
+}
+function unread_count(): int { return user() ? (int)val('SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0', [user()['id']]) : 0; }
+function my_children(): array { return user() ? all('SELECT u.*,pl.relation FROM parent_links pl JOIN users u ON u.id=pl.student_id WHERE pl.parent_id=? ORDER BY u.name', [user()['id']]) : []; }
+function is_parent_of(int $sid): bool { return (bool)val('SELECT 1 FROM parent_links WHERE parent_id=? AND student_id=?', [user()['id'] ?? 0, $sid]); }
+
+/* ---------------- Exams & results ---------------- */
+function exam_grade(float $pct): string { return $pct >= 80 ? 'A+' : ($pct >= 70 ? 'A' : ($pct >= 60 ? 'B' : ($pct >= 50 ? 'C' : ($pct >= 40 ? 'D' : 'F')))); }
+// Returns [user_id => ['total','max','pct','grade','pass','rank','marks'=>[paper_id=>row]]]
+function exam_results(int $eid): array {
+    $papers = all('SELECT * FROM exam_papers WHERE exam_id=? ORDER BY sort,id', [$eid]);
+    $ex = one('SELECT * FROM exams WHERE id=?', [$eid]);
+    $uids = course_student_ids((int)$ex['course_id'], $ex['batch_id'] ? (int)$ex['batch_id'] : null);
+    $marks = [];
+    if ($papers) foreach (all('SELECT * FROM exam_marks WHERE paper_id IN (' . implode(',', array_column($papers, 'id')) . ')') as $m) $marks[$m['user_id']][$m['paper_id']] = $m;
+    $out = []; $max = array_sum(array_column($papers, 'max_marks'));
+    foreach ($uids as $u) {
+        $t = 0; $pass = true; $any = false;
+        foreach ($papers as $p) { $m = $marks[$u][$p['id']] ?? null; if ($m && !$m['absent'] && $m['marks'] !== null) { $t += (float)$m['marks']; $any = true; if ((float)$m['marks'] < $p['pass_marks']) $pass = false; } else $pass = false; }
+        $pct = $max ? $t * 100 / $max : 0;
+        $out[$u] = ['total' => $t, 'max' => $max, 'pct' => round($pct, 1), 'grade' => $any ? ($pass ? exam_grade($pct) : 'F') : '–', 'pass' => $pass && $any, 'any' => $any, 'marks' => $marks[$u] ?? []];
+    }
+    $sorted = $out; uasort($sorted, fn($a, $b) => $b['total'] <=> $a['total']);
+    $r = 0; $prev = null; $i = 0;
+    foreach ($sorted as $u => $x) { $i++; if ($x['total'] !== $prev) { $r = $i; $prev = $x['total']; } $out[$u]['rank'] = $x['any'] ? $r : null; }
+    return $out;
+}
+
+/* ---------------- Payroll ---------------- */
+function salary_calc(int $uid, string $period): array {
+    $r = one('SELECT * FROM salary_rules WHERE user_id=?', [$uid]);
+    if (!$r) return [0, 'No salary rule'];
+    if ($r['type'] === 'per_student') {
+        $n = (int)val('SELECT COUNT(*) FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE c.teacher_id=? AND e.status IN ("active","completed")', [$uid]);
+        return [round($n * (float)$r['amount']), "$n students × " . money($r['amount'])];
+    }
+    if ($r['type'] === 'percent') {
+        $f = (float)val('SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN courses c ON c.id=p.course_id WHERE c.teacher_id=? AND DATE_FORMAT(p.paid_on,"%Y-%m")=?', [$uid, $period]);
+        return [round($f * (float)$r['amount'] / 100), (float)$r['amount'] . '% of ' . money($f) . ' fees collected'];
+    }
+    return [(float)$r['amount'], 'Fixed monthly salary'];
+}
+function child_id(): int { // parent: selected child (or first); others: self
+    $u = user(); if (!$u) return 0;
+    if ($u['role'] !== 'parent') return (int)$u['id'];
+    $c = (int)get('child'); if ($c && is_parent_of($c)) return $c;
+    return (int)(val('SELECT student_id FROM parent_links WHERE parent_id=? ORDER BY student_id LIMIT 1', [$u['id']]) ?: 0);
 }

@@ -1,7 +1,7 @@
 <?php
 $me = user();
 $r = one('SELECT p.*,u.name,u.phone,u.email,c.title FROM payments p JOIN users u ON u.id=p.user_id LEFT JOIN courses c ON c.id=p.course_id WHERE p.id=?', [$id]);
-if (!$r || (!role('admin') && (int)$r['user_id'] !== (int)$me['id'])) { echo '<p class="empty">Not found</p>'; return; }
+if (!$r || (!role('admin') && (int)$r['user_id'] !== (int)$me['id'] && !is_parent_of((int)$r['user_id']))) { echo '<p class="empty">Not found</p>'; return; }
 $title = 'Receipt #' . $r['id']; $back = role('admin') ? "?p=user&id={$r['user_id']}" : '?p=fees';
 ?>
 <div class="card receipt" id="rcpt">

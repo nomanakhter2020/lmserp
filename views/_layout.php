@@ -12,15 +12,16 @@ $icons = [
     'my' => '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
     'fees' => '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/>',
     'users' => '<circle cx="9" cy="8" r="4"/><path d="M1 21a8 8 0 0 1 16 0M17 4a4 4 0 0 1 0 8M23 21a8 8 0 0 0-5-7"/>',
+    'bell' => '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
     'more' => '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
 ];
-function ico($k) { global $icons; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $icons[$k] . '</svg>'; }
-$nav = !$u ? [] : ($u['role'] === 'admin'
+function ico($k) { global $icons; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . ($icons[$k] ?? $icons['bell']) . '</svg>'; }
+$nav = !$u ? [] : ($u['role'] === 'parent' ? ['home' => 'Home', 'fees' => 'Fees', 'notifications' => 'Alerts', 'more' => 'More'] : ($u['role'] === 'admin'
     ? ['home' => 'Home', 'courses' => 'Courses', 'users' => 'People', 'fees' => 'Fees', 'more' => 'More']
     : ($u['role'] === 'teacher'
         ? ['home' => 'Home', 'courses' => 'Courses', 'my' => 'My Learning', 'users' => 'Students', 'more' => 'More']
-        : ['home' => 'Home', 'my' => 'My Courses', 'courses' => 'Browse', 'more' => 'More']));
-$active = ['course' => 'courses', 'course_edit' => 'courses', 'lesson' => 'courses', 'lesson_edit' => 'courses', 'quiz' => 'courses', 'quiz_edit' => 'courses', 'user' => 'users', 'user_edit' => 'users', 'enrollments' => 'users', 'expenses' => 'more', 'recurring' => 'more', 'expense_cats' => 'more', 'proofs' => 'fees', 'certificates' => 'more', 'vouchers' => 'fees', 'voucher_gen' => 'fees', 'voucher' => 'fees', 'batches' => 'more', 'batch' => 'more', 'batch_edit' => 'more', 'attendance' => 'more', 'att_report' => 'more', 'posts' => 'more', 'post_edit' => 'more', 'messages' => 'more', 'pages_edit' => 'more', 'teachers' => 'more', 'tprofile' => 'more', 'reports' => 'more', 'settings' => 'more', 'profile' => 'more', 'announcements' => 'more'][$page] ?? $page;
+        : ['home' => 'Home', 'my' => 'My Courses', 'courses' => 'Browse', 'more' => 'More'])));
+$active = ['course' => 'courses', 'course_edit' => 'courses', 'lesson' => 'courses', 'lesson_edit' => 'courses', 'quiz' => 'courses', 'quiz_edit' => 'courses', 'user' => 'users', 'user_edit' => 'users', 'enrollments' => 'users', 'expenses' => 'more', 'recurring' => 'more', 'expense_cats' => 'more', 'proofs' => 'fees', 'attendance_me' => 'home', 'payroll' => 'more', 'slip' => 'more', 'exams' => 'more', 'exam' => 'more', 'exam_edit' => 'more', 'result' => 'more', 'assignments' => 'more', 'assignment' => 'more', 'assign_edit' => 'more', 'certificates' => 'more', 'vouchers' => 'fees', 'voucher_gen' => 'fees', 'voucher' => 'fees', 'batches' => 'more', 'batch' => 'more', 'batch_edit' => 'more', 'attendance' => 'more', 'att_report' => 'more', 'posts' => 'more', 'post_edit' => 'more', 'messages' => 'more', 'pages_edit' => 'more', 'teachers' => 'more', 'tprofile' => 'more', 'reports' => 'more', 'settings' => 'more', 'profile' => 'more', 'announcements' => 'more'][$page] ?? $page;
 if ($u && in_array($u['role'], ['student', 'teacher'], true) && in_array($page, ['lesson', 'quiz', 'quiz_result'])) { $lc = $page === 'lesson' ? val('SELECT course_id FROM lessons WHERE id=?', [(int)get('id')]) : val('SELECT course_id FROM quizzes WHERE id=?', [(int)get('id')]); if ($u['role'] === 'student' || ($lc && !val('SELECT 1 FROM courses WHERE id=? AND teacher_id=?', [$lc, $u['id']]))) $active = 'my'; }
 if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
 ?><!doctype html>
@@ -35,6 +36,7 @@ if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
 <header class="top">
   <?php if ($back): ?><a class="backbtn" href="<?= e($back) ?>" aria-label="Back">‹</a><?php endif ?>
   <div class="ttl"><?= e($title ?: $inst) ?></div>
+  <?php $__nc = unread_count(); ?><a class="bell" href="?p=notifications" aria-label="Notifications"><?= ico('bell') ?><?php if ($__nc): ?><i><?= $__nc > 9 ? '9+' : $__nc ?></i><?php endif ?></a>
   <a class="avatar" href="?p=profile"><?= e(mb_strtoupper(mb_substr($u['name'], 0, 1))) ?></a>
 </header>
 <?php endif ?>

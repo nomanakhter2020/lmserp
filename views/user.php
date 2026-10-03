@@ -77,6 +77,18 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <?php $ub = all('SELECT b.id,b.name,c.title FROM batch_students s JOIN batches b ON b.id=s.batch_id JOIN courses c ON c.id=b.course_id WHERE s.user_id=?', [$id]); if ($ub): ?><h2>Batches & attendance</h2><div class="list"><?php foreach ($ub as $x): $ap = att_percent($id, (int)$x['id']); ?>
   <a class="row" href="?p=batch&id=<?= $x['id'] ?>"><div class="grow"><b><?= e($x['name']) ?></b><small><?= e($x['title']) ?></small></div><?php if ($ap !== null): ?><span class="pill <?= $ap >= 75 ? 'ok' : ($ap >= 50 ? 'warn' : 'err') ?>"><?= $ap ?>%</span><?php endif ?></a>
 <?php endforeach ?></div><?php endif ?>
+<?php if (role('admin') && $u['role'] === 'student'): $ps = all('SELECT u.*,pl.relation FROM parent_links pl JOIN users u ON u.id=pl.parent_id WHERE pl.student_id=?', [$id]); ?>
+<h2>Parents / guardians</h2>
+<div class="list"><?php foreach ($ps as $pp): ?><div class="row"><div class="grow"><b><?= e($pp['name']) ?></b><small><?= e($pp['relation']) ?> · <?= e($pp['email']) ?> · <?= e($pp['phone']) ?></small></div>
+  <?php if ($pp['phone']): ?><a class="x" href="https://wa.me/<?= wa_num($pp['phone']) ?>" target="_blank" rel="noopener">💬</a><?php endif ?>
+  <form method="post" onsubmit="return confirm('Unlink parent?')"><?= csrf_field() ?><input type="hidden" name="a" value="parent_unlink"><input type="hidden" name="parent_id" value="<?= $pp['id'] ?>"><input type="hidden" name="student_id" value="<?= $id ?>"><button class="x">✕</button></form></div><?php endforeach; if (!$ps): ?><p class="empty">No parent linked</p><?php endif ?></div>
+<details class="card"><summary>＋ Add parent login</summary><form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="parent_add"><input type="hidden" name="student_id" value="<?= $id ?>">
+  <div class="two"><input name="name" placeholder="Parent name" required><select name="relation"><option>Father</option><option>Mother</option><option>Guardian</option></select></div>
+  <div class="two"><input name="email" type="email" placeholder="Email (login)" required><input name="phone" placeholder="Phone / WhatsApp"></div>
+  <input name="password" placeholder="Password (leave blank to auto-generate)">
+  <p class="muted" style="font-size:12.5px">If this email already has a parent account (e.g. siblings), the student is simply linked to it.</p>
+  <button class="btn block">Create / link parent</button></form></details>
+<?php endif ?>
 <?php if ($atts): ?><h2>Quiz attempts</h2><div class="list"><?php foreach ($atts as $a): ?>
   <div class="row"><div class="grow"><b><?= e($a['title']) ?></b><small><?= date('d M Y', strtotime($a['created_at'])) ?></small></div><span class="pill"><?= $a['score'] ?>/<?= $a['total'] ?></span></div>
 <?php endforeach ?></div><?php endif ?>

@@ -1,8 +1,8 @@
 <?php
 $me = user();
 $v = one('SELECT v.*,u.name,u.phone,u.email,c.title ctitle FROM fee_vouchers v JOIN users u ON u.id=v.user_id LEFT JOIN courses c ON c.id=v.course_id WHERE v.id=?', [$id]);
-if (!$v || (!role('admin') && (int)$v['user_id'] !== (int)$me['id'])) { echo '<p class="empty">Voucher not found</p>'; return; }
-$title = voucher_no($v); $back = role('admin') ? '?p=vouchers' : '?p=fees';
+if (!$v || (!role('admin') && (int)$v['user_id'] !== (int)$me['id'] && !is_parent_of((int)$v['user_id']))) { echo '<p class="empty">Voucher not found</p>'; return; }
+$title = voucher_no($v); $back = role('admin') ? '?p=vouchers' : '?p=fees' . (role('parent') ? '&child=' . $v['user_id'] : '');
 $inst = setting('institute', APP_NAME); $od = voucher_overdue($v); $total = voucher_total($v);
 $pend = val('SELECT id FROM payment_requests WHERE voucher_id=? AND status="pending"', [$id]);
 $accts = array_filter(['Bank' => setting('pay_bank'), 'JazzCash' => setting('pay_jazzcash'), 'EasyPaisa' => setting('pay_easypaisa')]);

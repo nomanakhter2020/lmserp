@@ -40,6 +40,7 @@ if (role('admin')):
   <div class="row"><div><b><?= e($r['name']) ?></b><small><?= e($r['paid_on']) ?> · <?= e($r['method']) ?></small></div><b class="pos"><?= money($r['amount']) ?></b></div>
 <?php endforeach; if (!$recent): ?><p class="empty">No payments yet</p><?php endif ?></div>
 
+<?php elseif (role('parent')): require __DIR__ . '/_parent_home.php'; ?>
 <?php elseif (role('teacher')):
   $cs = all('SELECT c.*,(SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) st,(SELECT COUNT(*) FROM lessons l WHERE l.course_id=c.id) ls FROM courses c WHERE teacher_id=? ORDER BY c.id DESC', [$me['id']]);
   $tot = array_sum(array_column($cs, 'st'));

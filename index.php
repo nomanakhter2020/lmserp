@@ -120,7 +120,7 @@ if ($isPost) {
 
         case 'user_save':
             require_role('admin');
-            $role = in_array(post('role'), ['admin', 'teacher', 'student'], true) ? post('role') : 'student';
+            $role = in_array(post('role'), ['admin', 'teacher', 'student', 'parent'], true) ? post('role') : 'student';
             if ($id) {
                 q('UPDATE users SET name=?,email=?,phone=?,role=?,active=? WHERE id=?', [post('name'), post('email'), post('phone'), $role, post('active') ? 1 : 0, $id]);
                 if ((string)($_POST['password'] ?? '') !== '') q('UPDATE users SET password=? WHERE id=?', [password_hash($_POST['password'], PASSWORD_DEFAULT), $id]);
@@ -136,16 +136,18 @@ if ($isPost) {
             if (post('activate') && (int)post('course_id')) q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [(int)post('user_id'), (int)post('course_id')]);
             flash('Payment recorded'); redirect(post('back', '?p=fees'));
         case 'proof_submit':
-            $vch = post('voucher_id') ? one('SELECT * FROM fee_vouchers WHERE id=? AND user_id=? AND status="unpaid"', [(int)post('voucher_id'), $me['id']]) : null;
+            $vch = post('voucher_id') ? one('SELECT * FROM fee_vouchers WHERE id=? AND status="unpaid"', [(int)post('voucher_id')]) : null;
+            if ($vch && (int)$vch['user_id'] !== (int)$me['id'] && !is_parent_of((int)$vch['user_id'])) $vch = null;
+            $payer = $vch ? (int)$vch['user_id'] : (int)$me['id'];
             if ($vch) $id = (int)$vch['course_id'];
             $c = one('SELECT * FROM courses WHERE id=?', [$id]) ?: ($vch ? ['id' => 0, 'fee' => voucher_total($vch)] : null);
-            $en = $c && $c['id'] ? one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]) : ($vch ? ['ok' => 1] : null);
+            $en = $vch ? ['ok' => 1] : ($c && $c['id'] ? one('SELECT * FROM enrollments WHERE user_id=? AND course_id=?', [$me['id'], $id]) : null);
             if (!$en) redirect('?p=courses');
             $back = $vch ? '?p=voucher&id=' . $vch['id'] : "?p=course&id=$id";
             $method = in_array(post('method'), ['Bank', 'JazzCash', 'EasyPaisa', 'Cash'], true) ? post('method') : 'Bank';
             try { $proof = save_upload('proof'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect($back); }
             if ($method !== 'Cash' && !$proof && post('txn_ref') === '') { flash('Upload a screenshot or enter the transaction ID', 'err'); redirect($back); }
-            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note,voucher_id) VALUES(?,?,?,?,?,?,?,?)', [$me['id'], $id, (float)post('amount', $vch ? voucher_total($vch) : course_fee_for($c)), $method, post('txn_ref'), $proof, post('note'), $vch['id'] ?? null]);
+            q('INSERT INTO payment_requests(user_id,course_id,amount,method,txn_ref,proof,note,voucher_id) VALUES(?,?,?,?,?,?,?,?)', [$payer, $id, (float)post('amount', $vch ? voucher_total($vch) : course_fee_for($c)), $method, post('txn_ref'), $proof, post('note'), $vch['id'] ?? null]);
             flash($method === 'Cash' ? 'Noted. Pay cash at the office; admin will confirm it.' : 'Payment proof sent. The admin will verify it shortly.');
             redirect($back);
         case 'proof_review':
@@ -156,15 +158,18 @@ if ($isPost) {
                 $amt = (float)post('amount', $r['amount']);
                 if ($r['voucher_id'] && ($pid = pay_voucher((int)$r['voucher_id'], $amt, $r['method'], date('Y-m-d'), $r['txn_ref'] ? 'Ref ' . $r['txn_ref'] : 'Online proof'))) {
                     q('UPDATE payment_requests SET status="approved",amount=?,payment_id=?,admin_note=? WHERE id=?', [$amt, $pid, post('admin_note'), $id]);
+                    notify((int)$r['user_id'], 'Payment approved', money($amt) . ' received — voucher paid', "?p=receipt&id=$pid", '✅', true);
                     flash('Approved — voucher marked paid'); redirect('?p=proofs');
                 }
                 q('INSERT INTO payments(user_id,course_id,amount,method,note,paid_on,created_by) VALUES(?,?,?,?,?,?,?)', [$r['user_id'], $r['course_id'], $amt, $r['method'], ($r['txn_ref'] ? 'Ref ' . $r['txn_ref'] : ($r['method'] === 'Cash' ? 'Cash at office' : 'Online proof')), date('Y-m-d'), $me['id']]);
                 $pid = db()->lastInsertId();
                 q('UPDATE payment_requests SET status="approved",amount=?,payment_id=?,admin_note=? WHERE id=?', [$amt, $pid, post('admin_note'), $id]);
                 q('UPDATE enrollments SET status="active" WHERE user_id=? AND course_id=? AND status="pending"', [$r['user_id'], $r['course_id']]);
+                notify((int)$r['user_id'], 'Payment approved', money($amt) . ' received — your course is unlocked', "?p=receipt&id=$pid", '✅', true);
                 flash('Approved — payment recorded and course unlocked');
             } else {
                 q('UPDATE payment_requests SET status="rejected",admin_note=? WHERE id=?', [post('admin_note'), $id]);
+                notify((int)$r['user_id'], 'Payment proof not accepted', post('admin_note') ?: 'Please submit again', $r['voucher_id'] ? '?p=voucher&id=' . $r['voucher_id'] : '?p=course&id=' . $r['course_id'], '⚠️', true);
                 flash('Request rejected');
             }
             redirect('?p=proofs');
@@ -201,6 +206,7 @@ if ($isPost) {
             $cid = (int)post('course_id') ?: null;
             if ($cid) { $c = one('SELECT * FROM courses WHERE id=?', [$cid]); if (!$c || !can_manage_course($c)) exit('Not allowed'); } elseif (!role('admin')) exit('Not allowed');
             q('INSERT INTO announcements(course_id,title,body,created_by) VALUES(?,?,?,?)', [$cid, post('title'), post('body'), $me['id']]);
+            notify($cid ? course_student_ids($cid) : array_map('intval', array_column(all('SELECT id FROM users WHERE active=1 AND id<>?', [$me['id']]), 'id')), '📣 ' . post('title'), mb_strimwidth(post('body'), 0, 140, '…'), $cid ? "?p=course&id=$cid" : '?p=announcements', '📣', (bool)$cid);
             flash('Announcement posted'); redirect($cid ? "?p=course&id=$cid" : '?p=announcements');
         case 'announce_delete':
             require_role('admin'); q('DELETE FROM announcements WHERE id=?', [$id]); redirect('?p=announcements');
@@ -234,6 +240,8 @@ if ($isPost) {
             flash(role('admin') ? 'Article saved' : ($review === 'pending' ? 'Submitted for review. It will go live after admin approval.' : 'Draft saved')); redirect("?p=post_edit&id=$id");
         case 'post_review':
             require_role('admin');
+            $au = (int)val('SELECT author_id FROM posts WHERE id=?', [$id]);
+            if ($au && $au !== (int)$me['id']) notify($au, post('decision') === 'approve' ? 'Your article is live 🎉' : 'Changes requested on your article', post('decision') === 'approve' ? '' : post('note'), "?p=post_edit&id=$id", '✍️');
             if (post('decision') === 'approve') { q('UPDATE posts SET published=1,review="",review_note="",created_at=IF(published=0 AND views=0,NOW(),created_at) WHERE id=?', [$id]); flash('Article approved and published'); }
             else { q('UPDATE posts SET published=0,review="rejected",review_note=? WHERE id=?', [post('note'), $id]); flash('Article sent back to the teacher'); }
             redirect(post('back', '?p=posts&f=pending'));
@@ -280,6 +288,8 @@ if ($isPost) {
                 if (!isset(ATT[$st])) continue;
                 q('REPLACE INTO attendance(batch_id,user_id,att_date,status,marked_by) VALUES(?,?,?,?,?)', [$id, (int)$uid, $d, $st, $me['id']]); $n++;
             }
+            $absent = array_keys(array_filter((array)($_POST['st'] ?? []), fn($v) => $v === 'A'));
+            if ($absent && $d === date('Y-m-d')) notify($absent, 'Marked absent today', $b['name'] . ' · ' . date('d M Y'), '?p=home', '⚠️', true);
             flash("Attendance saved for $n students"); redirect("?p=attendance&id=$id&date=$d&saved=1");
         case 'plan_save':
             require_role('admin');
@@ -318,6 +328,125 @@ if ($isPost) {
         case 'enroll_discount':
             require_role('admin'); q('UPDATE enrollments SET discount=? WHERE id=?', [max(0, min(100, (int)post('discount'))), $id]);
             flash('Scholarship / discount saved (applies to new vouchers)'); redirect(post('back', '?p=enrollments'));
+        case 'assign_save':
+            $c = one('SELECT * FROM courses WHERE id=?', [(int)post('course_id')]); if (!$c || !can_manage_course($c)) exit('Not allowed');
+            $data = [$c['id'], (int)post('batch_id') ?: null, post('title'), post('instructions'), post('attachment_url'), post('due_at') ? str_replace('T', ' ', post('due_at')) : null, max(1, (int)post('max_marks', 10))];
+            $new = !$id;
+            if ($id) q('UPDATE assignments SET course_id=?,batch_id=?,title=?,instructions=?,attachment_url=?,due_at=?,max_marks=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO assignments(course_id,batch_id,title,instructions,attachment_url,due_at,max_marks,created_by) VALUES(?,?,?,?,?,?,?,?)', [...$data, $me['id']]); $id = (int)db()->lastInsertId(); }
+            if ($new) notify(course_student_ids((int)$c['id'], (int)post('batch_id') ?: null), 'New assignment: ' . post('title'), $c['title'] . (post('due_at') ? ' · due ' . date('d M, g:i a', strtotime(post('due_at'))) : ''), "?p=assignment&id=$id", '📝', true);
+            flash('Assignment saved' . ($new ? ' and students notified' : '')); redirect("?p=assignment&id=$id");
+        case 'assign_delete':
+            $as = one('SELECT a.*,c.teacher_id FROM assignments a JOIN courses c ON c.id=a.course_id WHERE a.id=?', [$id]); if (!$as || !can_manage_course($as)) exit('Not allowed');
+            q('DELETE FROM submissions WHERE assignment_id=?', [$id]); q('DELETE FROM assignments WHERE id=?', [$id]); flash('Assignment deleted'); redirect('?p=assignments');
+        case 'submit_work':
+            $as = one('SELECT * FROM assignments WHERE id=?', [$id]);
+            if (!$as || !val('SELECT 1 FROM enrollments WHERE user_id=? AND course_id=? AND status<>"pending"', [$me['id'], $as['course_id']])) exit('Not allowed');
+            $old = one('SELECT * FROM submissions WHERE assignment_id=? AND user_id=?', [$id, $me['id']]);
+            if ($old && $old['marks'] !== null) { flash('This assignment is already graded', 'err'); redirect("?p=assignment&id=$id"); }
+            try { $file = save_upload('file'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect("?p=assignment&id=$id"); }
+            if (!$file && post('answer') === '' && !$old) { flash('Write an answer or attach a file', 'err'); redirect("?p=assignment&id=$id"); }
+            q('INSERT INTO submissions(assignment_id,user_id,answer,file) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE answer=VALUES(answer),file=IF(VALUES(file)="",file,VALUES(file)),submitted_at=NOW()', [$id, $me['id'], post('answer'), $file]);
+            $tid = (int)val('SELECT teacher_id FROM courses WHERE id=?', [$as['course_id']]);
+            if ($tid) notify($tid, $me['name'] . ' submitted: ' . $as['title'], '', "?p=assignment&id=$id", '📥');
+            flash('Submitted! Your teacher will review it.'); redirect("?p=assignment&id=$id");
+        case 'grade_save':
+            $as = one('SELECT a.*,c.teacher_id FROM assignments a JOIN courses c ON c.id=a.course_id WHERE a.id=?', [$id]); if (!$as || !can_manage_course($as)) exit('Not allowed');
+            $n = 0;
+            foreach ((array)($_POST['marks'] ?? []) as $uid => $mk) {
+                if ($mk === '' || $mk === null) continue;
+                $mk = max(0, min((float)$as['max_marks'], (float)$mk)); $fb = (string)($_POST['feedback'][$uid] ?? '');
+                $was = val('SELECT marks FROM submissions WHERE assignment_id=? AND user_id=?', [$id, (int)$uid]);
+                q('INSERT INTO submissions(assignment_id,user_id,marks,feedback,graded_at,graded_by) VALUES(?,?,?,?,NOW(),?) ON DUPLICATE KEY UPDATE marks=VALUES(marks),feedback=VALUES(feedback),graded_at=NOW(),graded_by=VALUES(graded_by)', [$id, (int)$uid, $mk, $fb, $me['id']]);
+                if ($was === null || $was === false || (float)$was !== $mk) notify((int)$uid, 'Assignment graded: ' . $as['title'], "You got $mk / {$as['max_marks']}" . ($fb ? " — $fb" : ''), "?p=assignment&id=$id", '✅', true);
+                $n++;
+            }
+            flash("$n grades saved"); redirect("?p=assignment&id=$id");
+        case 'exam_save':
+            $c = one('SELECT * FROM courses WHERE id=?', [(int)post('course_id')]); if (!$c || !can_manage_course($c)) exit('Not allowed');
+            $data = [$c['id'], (int)post('batch_id') ?: null, post('title'), post('exam_date') ?: null];
+            if ($id) q('UPDATE exams SET course_id=?,batch_id=?,title=?,exam_date=? WHERE id=?', [...$data, $id]);
+            else { q('INSERT INTO exams(course_id,batch_id,title,exam_date,created_by) VALUES(?,?,?,?,?)', [...$data, $me['id']]); $id = (int)db()->lastInsertId(); }
+            $keep = [];
+            foreach ((array)($_POST['subj'] ?? []) as $k => $sub) {
+                $sub = trim((string)$sub); if ($sub === '') continue;
+                $pid = (int)($_POST['pid'][$k] ?? 0); $mx = max(1, (int)($_POST['max'][$k] ?? 100)); $ps = max(0, (int)($_POST['pass'][$k] ?? 33));
+                if ($pid && val('SELECT id FROM exam_papers WHERE id=? AND exam_id=?', [$pid, $id])) q('UPDATE exam_papers SET subject=?,max_marks=?,pass_marks=?,sort=? WHERE id=?', [$sub, $mx, $ps, $k, $pid]);
+                else { q('INSERT INTO exam_papers(exam_id,subject,max_marks,pass_marks,sort) VALUES(?,?,?,?,?)', [$id, $sub, $mx, $ps, $k]); $pid = (int)db()->lastInsertId(); }
+                $keep[] = $pid;
+            }
+            if ($keep) { q('DELETE FROM exam_marks WHERE paper_id IN (SELECT id FROM exam_papers WHERE exam_id=? AND id NOT IN (' . implode(',', $keep) . '))', [$id]); q('DELETE FROM exam_papers WHERE exam_id=? AND id NOT IN (' . implode(',', $keep) . ')', [$id]); }
+            flash('Exam saved'); redirect("?p=exam&id=$id");
+        case 'exam_delete':
+            $ex = one('SELECT e.*,c.teacher_id FROM exams e JOIN courses c ON c.id=e.course_id WHERE e.id=?', [$id]); if (!$ex || !can_manage_course($ex)) exit('Not allowed');
+            q('DELETE FROM exam_marks WHERE paper_id IN (SELECT id FROM exam_papers WHERE exam_id=?)', [$id]); q('DELETE FROM exam_papers WHERE exam_id=?', [$id]); q('DELETE FROM exams WHERE id=?', [$id]);
+            flash('Exam deleted'); redirect('?p=exams');
+        case 'marks_save':
+            $ex = one('SELECT e.*,c.teacher_id FROM exams e JOIN courses c ON c.id=e.course_id WHERE e.id=?', [$id]); if (!$ex || !can_manage_course($ex)) exit('Not allowed');
+            $papers = array_column(all('SELECT id,max_marks FROM exam_papers WHERE exam_id=?', [$id]), 'max_marks', 'id');
+            foreach ((array)($_POST['m'] ?? []) as $uid => $row) foreach ((array)$row as $pid => $v) {
+                if (!isset($papers[$pid])) continue; $v = trim((string)$v);
+                if ($v === '') { q('DELETE FROM exam_marks WHERE paper_id=? AND user_id=?', [$pid, (int)$uid]); continue; }
+                $abs = strtoupper($v) === 'A' ? 1 : 0;
+                q('REPLACE INTO exam_marks(paper_id,user_id,marks,absent) VALUES(?,?,?,?)', [$pid, (int)$uid, $abs ? null : max(0, min((float)$papers[$pid], (float)$v)), $abs]);
+            }
+            if (post('publish')) {
+                q('UPDATE exams SET published=1 WHERE id=?', [$id]);
+                notify(course_student_ids((int)$ex['course_id'], $ex['batch_id'] ? (int)$ex['batch_id'] : null), 'Result published: ' . $ex['title'], 'Tap to view your result card', "?p=result&id=$id", '🏆', true);
+                flash('Marks saved and result published — students & parents notified');
+            } else flash('Marks saved');
+            redirect("?p=exam&id=$id");
+        case 'exam_unpublish':
+            $ex = one('SELECT e.*,c.teacher_id FROM exams e JOIN courses c ON c.id=e.course_id WHERE e.id=?', [$id]); if (!$ex || !can_manage_course($ex)) exit('Not allowed');
+            q('UPDATE exams SET published=0 WHERE id=?', [$id]); flash('Result hidden from students'); redirect("?p=exam&id=$id");
+        case 'salary_rule':
+            require_role('admin');
+            $t = in_array(post('type'), ['fixed', 'per_student', 'percent'], true) ? post('type') : 'fixed';
+            q('REPLACE INTO salary_rules(user_id,type,amount) VALUES(?,?,?)', [(int)post('user_id'), $t, (float)post('amount')]);
+            flash('Salary rule saved'); redirect(post('back', '?p=payroll'));
+        case 'slips_generate':
+            require_role('admin');
+            $per = preg_match('/^\d{4}-\d{2}$/', post('period')) ? post('period') : date('Y-m'); $n = 0;
+            foreach (all('SELECT r.user_id FROM salary_rules r JOIN users u ON u.id=r.user_id WHERE u.active=1') as $r) {
+                if (val('SELECT id FROM salary_slips WHERE user_id=? AND period=?', [$r['user_id'], $per])) continue;
+                [$basic, $basis] = salary_calc((int)$r['user_id'], $per);
+                q('INSERT INTO salary_slips(user_id,period,basic,net,basis) VALUES(?,?,?,?,?)', [$r['user_id'], $per, $basic, $basic, $basis]); $n++;
+            }
+            flash("$n salary slips generated for " . date('F Y', strtotime("$per-01"))); redirect("?p=payroll&m=$per");
+        case 'slip_update':
+            require_role('admin');
+            $sl = one('SELECT * FROM salary_slips WHERE id=? AND status="unpaid"', [$id]);
+            if ($sl) { $b = (float)post('basic', $sl['basic']); $bo = (float)post('bonus'); $de = (float)post('deduction'); q('UPDATE salary_slips SET basic=?,bonus=?,deduction=?,net=?,note=? WHERE id=?', [$b, $bo, $de, max(0, $b + $bo - $de), post('note'), $id]); }
+            flash('Slip updated'); redirect("?p=slip&id=$id");
+        case 'slip_pay':
+            require_role('admin');
+            $sl = one('SELECT s.*,u.name FROM salary_slips s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.status="unpaid"', [$id]);
+            if ($sl) {
+                $cat = val('SELECT id FROM expense_categories WHERE name="Salaries"') ?: null; $d = post('paid_on', date('Y-m-d'));
+                q('INSERT INTO expenses(title,amount,spent_on,category_id,note) VALUES(?,?,?,?,?)', ['Salary — ' . $sl['name'] . ' (' . date('M Y', strtotime($sl['period'] . '-01')) . ')', $sl['net'], $d, $cat, 'Payroll slip #' . $id]);
+                q('UPDATE salary_slips SET status="paid",paid_on=?,method=?,expense_id=? WHERE id=?', [$d, post('method', 'Bank'), (int)db()->lastInsertId(), $id]);
+                notify((int)$sl['user_id'], 'Salary paid: ' . date('F Y', strtotime($sl['period'] . '-01')), money($sl['net']) . ' via ' . post('method', 'Bank'), "?p=slip&id=$id", '💰');
+            }
+            flash('Salary marked paid and added to expenses'); redirect("?p=slip&id=$id");
+        case 'slip_delete':
+            require_role('admin'); q('DELETE FROM salary_slips WHERE id=? AND status="unpaid"', [$id]); flash('Slip deleted'); redirect('?p=payroll');
+        case 'parent_add':
+            require_role('admin');
+            $sid = (int)post('student_id'); $email = strtolower(post('email'));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { flash('Valid parent email required', 'err'); redirect("?p=user&id=$sid"); }
+            $pid = (int)val('SELECT id FROM users WHERE email=?', [$email]);
+            if ($pid && val('SELECT role FROM users WHERE id=?', [$pid]) !== 'parent') { flash('That email belongs to a non-parent account', 'err'); redirect("?p=user&id=$sid"); }
+            $pw = post('password') ?: substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 8);
+            if (!$pid) { q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,"parent")', [post('name'), $email, post('phone'), password_hash($pw, PASSWORD_DEFAULT)]); $pid = (int)db()->lastInsertId(); $msg = "Parent account created — login: $email / password: $pw"; }
+            else $msg = 'Linked to existing parent account';
+            q('INSERT IGNORE INTO parent_links(parent_id,student_id,relation) VALUES(?,?,?)', [$pid, $sid, post('relation', 'Parent')]);
+            flash($msg); redirect("?p=user&id=$sid");
+        case 'parent_unlink':
+            require_role('admin'); q('DELETE FROM parent_links WHERE parent_id=? AND student_id=?', [(int)post('parent_id'), (int)post('student_id')]); flash('Parent unlinked'); redirect('?p=user&id=' . (int)post('student_id'));
+        case 'notif_read_all':
+            q('UPDATE notifications SET is_read=1 WHERE user_id=?', [$me['id']]); redirect('?p=notifications');
+        case 'notif_clear':
+            q('DELETE FROM notifications WHERE user_id=? AND is_read=1', [$me['id']]); redirect('?p=notifications');
         case 'category_add':
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
@@ -366,6 +495,13 @@ if ($p === 'cover') { // public: course covers are shown on the website
     header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path));
     header('Cache-Control: public, max-age=2592000, immutable');
     readfile($path); exit;
+}
+if ($p === 'sub_file') {
+    require_login();
+    $sb = one('SELECT s.*,a.course_id,c.teacher_id FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN courses c ON c.id=a.course_id WHERE s.id=?', [$id]);
+    if (!$sb || !$sb['file'] || !((int)$sb['user_id'] === (int)user()['id'] || can_manage_course($sb) || is_parent_of((int)$sb['user_id']))) { http_response_code(404); exit; }
+    $path = UPLOAD_DIR . '/' . basename($sb['file']); if (!is_file($path)) { http_response_code(404); exit; }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
 }
 if ($p === 'proof_file') {
     require_login();
