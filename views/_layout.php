@@ -54,6 +54,7 @@ if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
   <a class="avatar" href="?p=profile"><?= e(mb_strtoupper(mb_substr($u['name'], 0, 1))) ?></a>
 </header>
 <?php endif ?>
+<?php if (!empty($_SESSION['imp_from'])): ?><div class="impbar">👁 Viewing as <b><?= e(user()['name'] ?? '') ?></b> · <a href="?p=imp_stop&t=<?= csrf() ?>">Back to my account ↩</a></div><?php endif ?>
 <main class="<?= $u ? 'wrap' : '' ?>">
 <?php if ($f = flash()): ?><div class="alert <?= $f[1] ?>"><?= e($f[0]) ?></div><?php endif ?>
 <?= $body ?>

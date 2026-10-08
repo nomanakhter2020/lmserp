@@ -10,6 +10,7 @@ $pic = fn($name, $label, $cur, $ratio) => '<label>' . $label . '<div class="cove
   <div class="rowhead"><b>Status: <span class="pill <?= ['active' => 'ok', 'pending' => 'warn', 'suspended' => 'err'][$in['status']] ?? '' ?>"><?= e(ucfirst($in['status'])) ?></span></b><a href="<?= e(inst_url($in)) ?>" target="_blank">View page ↗</a></div>
   <div class="quick" style="margin-top:10px"><?php if ($in['status'] !== 'active'): ?><button class="btn sm" name="status" value="active">✓ Approve &amp; publish</button><?php endif ?><?php if ($in['status'] !== 'suspended'): ?><button class="btn sm ghost" name="status" value="suspended">Suspend</button><?php endif ?><button class="btn sm ghost" name="featured" value="<?= $in['featured'] ? '0' : '1' ?>"><?= $in['featured'] ? '☆ Remove featured' : '★ Make featured' ?></button></div>
 </form>
+<?php $ou = is_super() ? one('SELECT id,email FROM users WHERE institution_id=? AND role="institute" AND active=1 ORDER BY id LIMIT 1', [$iid]) : null; if ($ou): ?><form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="impersonate"><input type="hidden" name="id" value="<?= (int)$ou['id'] ?>"><button class="btn ghost block">👁 Login as this institute (<?= e($ou['email']) ?>)</button></form><?php endif ?>
 <?php endif ?>
 <form method="post" class="card" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="a" value="inst_save"><input type="hidden" name="id" value="<?= $iid ?>">
   <label>Institute name<input name="name" value="<?= e($in['name']) ?>" required></label>

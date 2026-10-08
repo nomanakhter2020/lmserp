@@ -21,6 +21,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 <div class="quick">
   <?php if ($wa): ?><a href="https://wa.me/<?= $wa ?>" target="_blank" rel="noopener">💬 WhatsApp</a><a href="tel:<?= e($u['phone']) ?>">📞 Call</a><?php endif ?>
   <?php if (role('admin')): ?><a href="?p=user_edit&id=<?= $id ?>">✏️ Edit</a><?php endif ?>
+  <?php if (is_super() && (int)$u['id'] !== (int)$me['id'] && $u['active'] && !($u['role'] === 'admin' && $u['staff_role'] === 'super')): ?><form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="a" value="impersonate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="quickbtn">👁 Login as</button></form><?php endif ?>
   <?php if (role('admin') && $u['role'] === 'student' && val('SELECT 1 FROM certificates ce JOIN courses c ON c.id=ce.course_id WHERE ce.user_id=? AND c.program="trainer" AND ce.revoked=0', [$id])): ?><form method="post" style="display:inline" onsubmit="return confirm('Make this certified trainer a teacher?')"><?= csrf_field() ?><input type="hidden" name="a" value="promote_trainer"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn sm">🎤 Promote to teacher</button></form><?php endif ?>
   <?php if (role('admin') && $u['role'] !== 'student'): ?><a href="?p=tprofile&id=<?= $id ?>">🪪 CV profile</a><a href="?p=teacher&id=<?= $id ?>" target="_blank">🌐 View CV</a><?php endif ?>
 </div>

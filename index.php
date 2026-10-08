@@ -659,6 +659,12 @@ if ($isPost) {
             if ($logo) q('UPDATE institutions SET logo=? WHERE id=?', [$logo, $iid]);
             if ($cover) q('UPDATE institutions SET cover=? WHERE id=?', [$cover, $iid]);
             flash('Profile saved'); redirect('?p=inst_edit' . (role('admin') ? "&id=$iid" : ''));
+        case 'impersonate':
+            if (!is_super()) exit('Not allowed');
+            $t = one('SELECT * FROM users WHERE id=? AND active=1', [$id]);
+            if (!$t || (int)$t['id'] === (int)$me['id'] || ($t['role'] === 'admin' && $t['staff_role'] === 'super')) { flash('Cannot view as this user', 'err'); redirect("?p=user&id=$id"); }
+            $orig = (int)$me['id']; session_regenerate_id(true); $_SESSION = ['uid' => (int)$t['id'], 'imp_from' => $orig, 'seen' => time()];
+            redirect('?p=home');
         case 'inst_create':
             require_role('admin'); $nm = trim((string)post('name'));
             if ($nm === '') { flash('Enter the institute name', 'err'); redirect('?p=insts'); }
@@ -832,7 +838,10 @@ if ($p === 'sitemap') {
 }
 // Public website: guests landing on the root URL, or anyone via ?p=site
 if (mod('website') && (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site')) { require __DIR__ . (mall() ? '/views/mall_home.php' : '/views/landing.php'); exit; }
-if ($p === 'logout') { if (hash_equals(csrf(), (string)get('t'))) { $_SESSION = []; session_destroy(); } redirect('?p=login'); }
+if ($p === 'imp_stop' && !empty($_SESSION['imp_from']) && hash_equals(csrf(), (string)get('t'))) {
+    $orig = (int)$_SESSION['imp_from']; session_regenerate_id(true); $_SESSION = ['uid' => $orig, 'seen' => time()]; redirect('?p=users');
+}
+if ($p === 'logout') { if (!empty($_SESSION['imp_from']) && hash_equals(csrf(), (string)get('t'))) { $orig = (int)$_SESSION['imp_from']; session_regenerate_id(true); $_SESSION = ['uid' => $orig, 'seen' => time()]; redirect('?p=users'); } if (hash_equals(csrf(), (string)get('t'))) { $_SESSION = []; session_destroy(); } redirect('?p=login'); }
 if ($p === 'twofa' && (empty($_SESSION['2fa_uid']) || user())) redirect('?p=login');
 if ($p === 'backup_dl') {
     require_role('admin'); $f = basename((string)get('f'));
