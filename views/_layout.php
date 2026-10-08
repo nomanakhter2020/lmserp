@@ -40,7 +40,13 @@ if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
 <link rel="manifest" href="manifest.json"><link rel="icon" href="assets/icon.svg"><link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="stylesheet" href="assets/style.css?v=<?= APP_VERSION ?>">
 </head><body class="<?= $u ? 'app' : 'auth' ?>">
-<?php if ($u): ?>
+<?php if ($u): $__groups = menu_groups(); $__cur = $active ?: $page; ?>
+<aside class="side">
+  <a class="side-brand" href="?p=home"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
+  <nav><?php foreach ($__groups as $g => $its): ?><div class="side-g"><?= e($g) ?></div><?php foreach ($its as [$k, $i, $l]): ?><a href="?p=<?= $k ?>" class="<?= ($page === $k || $__cur === $k) ? 'on' : '' ?>"><span><?= $i ?></span><?= $l ?></a><?php endforeach ?><?php endforeach ?>
+  <a href="?p=logout&t=<?= csrf() ?>" class="side-out"><span>🚪</span>Log out</a></nav>
+  <div class="side-foot"><?= e($u['name']) ?><small><?= e(ucfirst($u['role'])) ?> · v<?= APP_VERSION ?></small></div>
+</aside>
 <header class="top">
   <?php if ($back): ?><a class="backbtn" href="<?= e($back) ?>" aria-label="Back">‹</a><?php endif ?>
   <div class="ttl"><?= e($title ?: $inst) ?></div>

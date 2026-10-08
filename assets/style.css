@@ -168,3 +168,23 @@ body.auth{min-height:100vh;display:grid;place-items:center;padding:20px;backgrou
 .modrow{display:flex!important;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--ln,#e8e9f3);margin:0!important;cursor:pointer}.modrow .grow{display:flex;flex-direction:column}.modrow small{color:#6b7090;font-weight:400}
 .sw{appearance:none;-webkit-appearance:none;width:46px!important;height:26px;border-radius:13px;background:#d6d8e6;position:relative;flex:none;cursor:pointer;transition:.2s;margin:0!important;padding:0!important;border:0!important}.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}.sw:checked{background:#4f46e5}.sw:checked::after{left:23px}
 .adm .rowhead{align-items:flex-start}.admf{display:flex;gap:8px;flex-wrap:wrap}.admf select{width:auto;margin:0}.admf input{flex:1;min-width:140px;margin:0}
+/* ===== Desktop portal: left sidebar ===== */
+.side{display:none}.mgh{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin:18px 4px 8px}
+@media(min-width:1024px){
+  body.app{padding-left:256px}
+  .side{display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;width:256px;background:var(--card);border-right:1px solid var(--ln);z-index:6;overflow-y:auto}
+  .side-brand{display:flex;align-items:center;gap:10px;padding:18px 18px 12px;font-weight:800;font-size:16px;color:var(--tx);text-decoration:none;position:sticky;top:0;background:var(--card)}.side-brand img{width:32px;height:32px}
+  .side nav{display:flex;flex-direction:column;padding:4px 10px 10px;flex:1}
+  .side-g{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--mu);font-weight:700;margin:16px 10px 6px}
+  .side nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:var(--tx);text-decoration:none;font-size:14px;font-weight:500;line-height:1.25}
+  .side nav a span{width:22px;text-align:center;flex:none}
+  .side nav a:hover{background:color-mix(in srgb,var(--p) 8%,transparent)}
+  .side nav a.on{background:color-mix(in srgb,var(--p) 13%,transparent);color:var(--p);font-weight:700}
+  .side-out{margin-top:12px;color:var(--bad)!important}
+  .side-foot{padding:12px 18px;border-top:1px solid var(--ln);font-weight:700;font-size:13.5px;display:flex;flex-direction:column}.side-foot small{color:var(--mu);font-weight:500}
+  nav.bottom{display:none}
+  .wrap{max-width:1100px;padding:22px 28px 40px}
+  .top{padding-left:28px;padding-right:28px}
+  body.app{padding-bottom:0}
+  body.app main.wrap{padding-bottom:40px}
+}

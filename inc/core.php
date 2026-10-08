@@ -19,7 +19,7 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 const DB_VERSION = 18;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
@@ -553,6 +553,66 @@ function backup_now(): string {
     return basename($file);
 }
 function run_daily_backup(): void { if (setting('last_backup') !== date('Y-m-d')) { try { backup_now(); } catch (Throwable $e) { error_log('backup failed: ' . $e->getMessage()); } } }
+
+/* ---------------- App menu (sidebar on desktop, More on mobile) ---------------- */
+function menu_groups(): array {
+  if (!user()) return [];
+  $items = [
+  ['home', '🏠', 'Dashboard', true],
+  ['courses', '📚', role('student') ? 'Browse courses' : 'Courses', true],
+  ['my', '🎒', role('teacher') ? 'My learning' : 'My courses', role('student', 'teacher')],
+  ['users', '👥', role('admin') ? 'People' : 'My students', role('admin', 'teacher')],
+  ['vouchers', '🧾', 'Fee vouchers', role('admin')],
+  ['shop', '🛍️', 'Shop', role('student', 'parent')],
+  ['orders', '🛒', role('admin') ? 'Shop orders' . (($po = (int)val('SELECT COUNT(*) FROM orders WHERE status="pending"')) ? " ($po)" : '') : 'My orders', true],
+  ['products', '📚', role('admin') ? 'Shop products' . (($pp = (int)val('SELECT COUNT(*) FROM products WHERE review="pending"')) ? " ($pp pending)" : '') : 'My products', role('admin', 'teacher')],
+  ['earnings', '🤝', role('admin') ? 'Teacher sales & payouts' : 'My sales & earnings', role('admin', 'teacher')],
+  ['batches', '🗓️', 'Batches & attendance', role('admin', 'teacher')],
+  ['assignments', '📝', 'Assignments', true],
+  ['exams', '🧾', role('admin', 'teacher') ? 'Exams & results' : 'Results', true],
+  ['attendance_me', '🗓️', 'Attendance', role('student', 'parent')],
+  ['certificates', '🎓', role('admin') ? 'Certificates' : 'My certificates', !role('parent')],
+  ['notifications', '🔔', 'Notifications', true],
+  ['teachers', '👩‍🏫', 'Our teachers', true],
+  ['announcements', '📣', 'Announcements', true],
+  ['posts', '✍️', 'Blog posts' . (role('admin') && ($pr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')) ? " ($pr pending)" : ''), role('admin', 'teacher')],
+  ['messages', '📬', 'Contact messages' . (role('admin') && ($m = (int)val('SELECT COUNT(*) FROM contact_messages WHERE is_read=0')) ? " ($m)" : ''), role('admin')],
+  ['pages_edit', '📄', 'Website pages', role('admin')],
+  ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
+  ['fees', '💳', role('admin') ? 'Fees & payments' : (role('parent') ? 'Fees' : 'My fees'), role('admin', 'student', 'teacher', 'parent')],
+  ['enrollments', '📝', 'Enrollments', role('admin', 'teacher')],
+  ['expenses', '📉', 'Expenses', role('admin')],
+  ['payroll', '💰', role('admin') ? 'Teacher payroll' : 'My salary', role('admin', 'teacher')],
+  ['reports', '📊', 'Reports', role('admin')],
+  ['settings', '⚙️', 'Settings', role('admin')],
+  ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
+  ['insts', '🏫', 'Institutes' . (role('admin') && mall() && ($pi = (int)val('SELECT COUNT(*) FROM institutions WHERE status="pending"')) ? " ($pi pending)" : ''), role('admin') && mall()],
+  ['admissions', '📝', 'Admission enquiries', role('admin', 'institute') && mall()],
+  ['inst_edit', '✏️', 'Institute profile', role('institute')],
+  ['inst_teachers', '👩‍🏫', 'Our teachers', role('institute')],
+  ['my_insts', '🏫', 'My institutions', role('teacher') && mall()],
+  ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
+  ['biometric', '👆', 'Fingerprint login', true],
+  ['security', '🔐', role('admin') ? 'Security & backups' : 'Two-step verification', true],
+  ['help', '❓', 'Help & guides', true],
+  ['site', '🌐', 'Website', true],
+  ['profile', '👤', 'My profile', true],
+];
+  $grp = ['home' => 'Main', 'courses' => 'Main', 'my' => 'Main', 'users' => 'Main', 'insts' => 'Main', 'admissions' => 'Main', 'inst_edit' => 'Main', 'inst_teachers' => 'Main', 'my_insts' => 'Main',
+    'batches' => 'Academics', 'assignments' => 'Academics', 'exams' => 'Academics', 'attendance_me' => 'Academics', 'certificates' => 'Academics', 'enrollments' => 'Academics', 'teachers' => 'Academics', 'announcements' => 'Academics', 'tprofile' => 'Academics',
+    'fees' => 'Finance', 'vouchers' => 'Finance', 'proofs' => 'Finance', 'expenses' => 'Finance', 'payroll' => 'Finance', 'reports' => 'Finance', 'earnings' => 'Finance',
+    'shop' => 'Shop', 'orders' => 'Shop', 'products' => 'Shop',
+    'posts' => 'Website', 'messages' => 'Website', 'pages_edit' => 'Website', 'site' => 'Website',
+    'settings' => 'Settings', 'modules' => 'Settings', 'security' => 'Settings', 'biometric' => 'Settings', 'notifications' => 'Settings', 'profile' => 'Settings', 'help' => 'Settings'];
+  $instOk = ['home', 'courses', 'insts', 'admissions', 'inst_edit', 'inst_teachers', 'notifications', 'biometric', 'security', 'help', 'profile'];
+  $out = [];
+  foreach ($items as [$k, $i, $l, $show]) {
+    if (!$show || !view_on($k) || (role('institute') && !in_array($k, $instOk, true))) continue;
+    $out[$grp[$k] ?? 'Main'][] = [$k, $i, $l];
+  }
+  $ord = array_flip(['Main', 'Academics', 'Finance', 'Shop', 'Website', 'Settings']); uksort($out, fn($a, $b) => ($ord[$a] ?? 9) <=> ($ord[$b] ?? 9));
+  return $out;
+}
 
 function teacher_pct(): float { return max(0, min(100, (float)setting('teacher_share', '50'))); }
 function teacher_balance(int $tid): array {

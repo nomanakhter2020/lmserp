@@ -1,45 +1,11 @@
 <?php
 $title = 'More';
-$items = [
-  ['orders', '🛒', role('admin') ? 'Shop orders' . (($po = (int)val('SELECT COUNT(*) FROM orders WHERE status="pending"')) ? " ($po)" : '') : 'My orders', true],
-  ['products', '📚', role('admin') ? 'Shop products' . (($pp = (int)val('SELECT COUNT(*) FROM products WHERE review="pending"')) ? " ($pp pending)" : '') : 'My products', role('admin', 'teacher')],
-  ['earnings', '🤝', role('admin') ? 'Teacher sales & payouts' : 'My sales & earnings', role('admin', 'teacher')],
-  ['batches', '🗓️', 'Batches & attendance', role('admin', 'teacher')],
-  ['assignments', '📝', 'Assignments', true],
-  ['exams', '🧾', role('admin', 'teacher') ? 'Exams & results' : 'Results', true],
-  ['attendance_me', '🗓️', 'Attendance', role('student', 'parent')],
-  ['certificates', '🎓', role('admin') ? 'Certificates' : 'My certificates', !role('parent')],
-  ['notifications', '🔔', 'Notifications', true],
-  ['teachers', '👩‍🏫', 'Our teachers', true],
-  ['announcements', '📣', 'Announcements', true],
-  ['posts', '✍️', 'Blog posts' . (role('admin') && ($pr = (int)val('SELECT COUNT(*) FROM posts WHERE review="pending"')) ? " ($pr pending)" : ''), role('admin', 'teacher')],
-  ['messages', '📬', 'Contact messages' . (role('admin') && ($m = (int)val('SELECT COUNT(*) FROM contact_messages WHERE is_read=0')) ? " ($m)" : ''), role('admin')],
-  ['pages_edit', '📄', 'Website pages', role('admin')],
-  ['proofs', '🧾', 'Payment proofs' . (role('admin') && ($n = (int)val('SELECT COUNT(*) FROM payment_requests WHERE status="pending"')) ? " ($n)" : ''), role('admin')],
-  ['fees', '💳', role('parent') ? 'Fees' : 'My fees', role('student', 'teacher', 'parent')],
-  ['enrollments', '📝', 'Enrollments', role('admin', 'teacher')],
-  ['expenses', '📉', 'Expenses', role('admin')],
-  ['payroll', '💰', role('admin') ? 'Teacher payroll' : 'My salary', role('admin', 'teacher')],
-  ['reports', '📊', 'Reports', role('admin')],
-  ['settings', '⚙️', 'Settings', role('admin')],
-  ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
-  ['insts', '🏫', 'Institutes' . (role('admin') && mall() && ($pi = (int)val('SELECT COUNT(*) FROM institutions WHERE status="pending"')) ? " ($pi pending)" : ''), role('admin') && mall()],
-  ['admissions', '📝', 'Admission enquiries', role('admin', 'institute') && mall()],
-  ['inst_edit', '✏️', 'Institute profile', role('institute')],
-  ['inst_teachers', '👩‍🏫', 'Our teachers', role('institute')],
-  ['my_insts', '🏫', 'My institutions', role('teacher') && mall()],
-  ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
-  ['biometric', '👆', 'Fingerprint login', true],
-  ['security', '🔐', role('admin') ? 'Security & backups' : 'Two-step verification', true],
-  ['help', '❓', 'Help & guides', true],
-  ['site', '🌐', 'Website', true],
-  ['profile', '👤', 'My profile', true],
-];
+$groups = menu_groups(); unset($groups['Main'][0]);
 ?>
-<div class="list menu">
-<?php foreach ($items as [$k, $i, $l, $show]): if (!$show || !view_on($k) || (role('institute') && !in_array($k, ['insts', 'admissions', 'inst_edit', 'inst_teachers', 'notifications', 'biometric', 'security', 'help', 'courses', 'profile'], true))) continue; ?>
+<?php foreach ($groups as $g => $its): if (!$its) continue; ?><h3 class="mgh"><?= e($g) ?></h3><div class="list menu"><?php foreach ($its as [$k, $i, $l]): ?>
   <a class="row" href="?p=<?= $k ?>"><span class="mi"><?= $i ?></span><b class="grow"><?= $l ?></b><span>›</span></a>
-<?php endforeach ?>
+<?php endforeach ?></div><?php endforeach ?>
+<div class="list menu">
   <a class="row" href="?p=logout&t=<?= csrf() ?>"><span class="mi">🚪</span><b class="grow neg">Log out</b></a>
 </div>
 <p class="install-hint" hidden><button class="btn block ghost" id="installBtn">📲 Install app</button></p>
