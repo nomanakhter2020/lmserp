@@ -12,7 +12,7 @@ $batches = all('SELECT b.id,b.name,b.course_id FROM batches b WHERE b.active=1 O
   <label>For batch <small>(optional)</small><select name="batch_id" id="abatch"><option value="">All students of the course</option><?php foreach ($batches as $b): ?><option value="<?= $b['id'] ?>" data-c="<?= $b['course_id'] ?>" <?= $a['batch_id'] == $b['id'] ? 'selected' : '' ?>><?= e($b['name']) ?></option><?php endforeach ?></select></label>
   <label>Title<input name="title" value="<?= e($a['title']) ?>" required></label>
   <label>Instructions<textarea name="instructions" rows="6"><?= e($a['instructions']) ?></textarea></label>
-  <label>Attachment / reference link <small>(optional)</small><input name="attachment_url" type="url" value="<?= e($a['attachment_url']) ?>"></label>
+  <label>Attachment / reference link <small>(optional)</small><input name="attachment_url" type="url" value="<?= e(safe_link($a['attachment_url'])) ?>"></label>
   <div class="two"><label>Due<input name="due_at" type="datetime-local" value="<?= e($a['due_at'] ? date('Y-m-d\TH:i', strtotime($a['due_at'])) : '') ?>"></label><label>Total marks<input name="max_marks" type="number" min="1" value="<?= (int)$a['max_marks'] ?>"></label></div>
   <button class="btn block"><?= $id ? 'Save' : 'Create & notify students' ?></button>
 </form>

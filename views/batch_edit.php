@@ -16,7 +16,7 @@ $sel = explode(',', (string)$b['days']);
   <div class="daypick"><?php foreach (WEEKDAYS as $d): ?><label><input type="checkbox" name="days[]" value="<?= $d ?>" <?= in_array($d, $sel, true) ? 'checked' : '' ?>><span><?= $d ?></span></label><?php endforeach ?></div>
   <div class="two"><label>Start time<input type="time" name="start_time" value="<?= e(substr((string)$b['start_time'], 0, 5)) ?>"></label><label>End time<input type="time" name="end_time" value="<?= e(substr((string)$b['end_time'], 0, 5)) ?>"></label></div>
   <div class="two"><label>Room<input name="room" value="<?= e($b['room']) ?>" placeholder="Room 2"></label><label>Start date<input type="date" name="start_date" value="<?= e($b['start_date']) ?>"></label></div>
-  <label>Online class link <small>(Zoom / Meet, optional)</small><input name="meet_link" type="url" value="<?= e($b['meet_link']) ?>" placeholder="https://meet.google.com/…"></label>
+  <label>Online class link <small>(Zoom / Meet, optional)</small><input name="meet_link" type="url" value="<?= e(safe_link($b['meet_link'])) ?>" placeholder="https://meet.google.com/…"></label>
   <label class="check"><input type="checkbox" name="active" value="1" <?= $b['active'] ? 'checked' : '' ?>> Active</label>
   <button class="btn block">Save batch</button>
 </form>

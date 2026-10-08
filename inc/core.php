@@ -1,12 +1,26 @@
 <?php
 // LMS ERP core: config, db, auth, helpers
 declare(strict_types=1);
+define('IS_HTTPS', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+if (PHP_SAPI !== 'cli') {
+    ini_set('session.use_strict_mode', '1'); ini_set('session.use_only_cookies', '1'); ini_set('session.gc_maxlifetime', '86400');
+    session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => IS_HTTPS, 'httponly' => true, 'samesite' => 'Lax']);
+    // Security headers (also work where mod_headers is unavailable)
+    header('X-Frame-Options: SAMEORIGIN'); header('X-Content-Type-Options: nosniff'); header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()');
+    header("Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'");
+    if (IS_HTTPS) header('Strict-Transport-Security: max-age=31536000');
+    header_remove('X-Powered-By');
+}
 session_start();
+// Idle timeout: 24h without activity logs out
+if (isset($_SESSION['uid'], $_SESSION['seen']) && time() - (int)$_SESSION['seen'] > 86400) { $_SESSION = []; session_regenerate_id(true); }
+$_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.7.0';
-const DB_VERSION = 16;
+const APP_VERSION = '2.8.0';
+const DB_VERSION = 17;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -103,6 +117,8 @@ function migrate() {
         db()->exec("ALTER TABLE orders MODIFY user_id INT NULL");
     if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payments' AND COLUMN_NAME='user_id'") === 'NO')
         db()->exec("ALTER TABLE payments MODIFY user_id INT NULL");
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='totp_secret'"))
+        db()->exec("ALTER TABLE users ADD totp_secret VARCHAR(64) DEFAULT ''");
     foreach ([['products', 'teacher_id', 'INT NULL'], ['products', 'review', "VARCHAR(10) DEFAULT ''"], ['order_items', 'teacher_id', 'INT NULL'], ['order_items', 'teacher_share', 'DECIMAL(10,2) DEFAULT 0']] as [$t, $col, $def])
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?", [$t, $col]))
             db()->exec("ALTER TABLE $t ADD $col $def");
@@ -298,7 +314,12 @@ function pay_voucher(int $vid, float $amount, string $method, string $date, stri
 }
 
 /* ---------------- Certificates ---------------- */
+// Learner has real access to a course (active/completed enrollment)
+function is_enrolled(int $uid, int $cid): bool { return (bool)val('SELECT 1 FROM enrollments WHERE user_id=? AND course_id=? AND status IN ("active","completed")', [$uid, $cid]); }
+// Only http(s) links are allowed for user-supplied URLs (blocks javascript: etc.)
+function safe_link(?string $u): string { $u = trim((string)$u); return preg_match('~^https?://~i', $u) ? $u : ''; }
 function cert_eligibility(int $uid, int $cid): array {
+    if (!is_enrolled($uid, $cid)) return [false, 'Enroll in the course first'];
     if (course_progress($uid, $cid) < 100) return [false, 'Complete all lessons first'];
     foreach (all('SELECT id,title,pass_percent FROM quizzes WHERE course_id=?', [$cid]) as $q) {
         $best = val('SELECT MAX(ROUND(score*100/NULLIF(total,0))) FROM attempts WHERE quiz_id=? AND user_id=?', [$q['id'], $uid]);
@@ -312,7 +333,7 @@ function cert_grade(int $uid, int $cid): string {
     return $avg >= 85 ? 'Distinction' : ($avg >= 70 ? 'Merit' : 'Pass');
 }
 function issue_certificate(int $uid, int $cid, ?string $grade = null): string {
-    if ($code = val('SELECT code FROM certificates WHERE user_id=? AND course_id=?', [$uid, $cid])) { q('UPDATE certificates SET revoked=0 WHERE user_id=? AND course_id=?', [$uid, $cid]); return $code; }
+    if ($code = val('SELECT code FROM certificates WHERE user_id=? AND course_id=?', [$uid, $cid])) { if (role('admin')) q('UPDATE certificates SET revoked=0 WHERE user_id=? AND course_id=?', [$uid, $cid]); return $code; }
     do { $code = 'C' . strtoupper(substr(str_replace(['0', 'O', '1', 'I'], '', bin2hex(random_bytes(8))), 0, 4) . '-' . substr(strtoupper(bin2hex(random_bytes(3))), 0, 4)); } while (val('SELECT id FROM certificates WHERE code=?', [$code]));
     q('INSERT INTO certificates(user_id,course_id,code,grade,issued_by) VALUES(?,?,?,?,?)', [$uid, $cid, $code, $grade ?? cert_grade($uid, $cid), user()['id'] ?? null]);
     q('UPDATE enrollments SET status="completed" WHERE user_id=? AND course_id=?', [$uid, $cid]);
@@ -475,6 +496,41 @@ const MODULE_VIEWS = [
 function mod(string $m): bool { return setting('mod_' . $m, '1') === '1'; }
 function view_module(string $view): ?string { foreach (MODULE_VIEWS as $m => $vs) if (in_array($view, $vs, true)) return $m; return null; }
 function view_on(string $view): bool { $m = view_module($view); return $m === null || mod($m); }
+
+/* ---------------- Login protection ---------------- */
+function client_ip(): string { return substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45); }
+function login_blocked(string $email): bool {
+    q('DELETE FROM login_attempts WHERE at < NOW() - INTERVAL 1 DAY');
+    return (int)val('SELECT COUNT(*) FROM login_attempts WHERE email=? AND at > NOW() - INTERVAL 15 MINUTE', [strtolower($email)]) >= 5
+        || (int)val('SELECT COUNT(*) FROM login_attempts WHERE ip=? AND at > NOW() - INTERVAL 15 MINUTE', [client_ip()]) >= 20;
+}
+function login_failed(string $email): void { q('INSERT INTO login_attempts(email,ip) VALUES(?,?)', [strtolower(mb_substr($email, 0, 160)), client_ip()]); }
+function login_ok(array $u): void { q('DELETE FROM login_attempts WHERE email=?', [strtolower($u['email'])]); session_regenerate_id(true); unset($_SESSION['csrf'], $_SESSION['2fa_uid']); $_SESSION['uid'] = (int)$u['id']; }
+
+/* ---------------- TOTP two-step verification (Google Authenticator) ---------------- */
+function b32_decode(string $b): string { $a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $bits = ''; foreach (str_split(strtoupper(rtrim($b, '='))) as $c) { $v = strpos($a, $c); if ($v === false) continue; $bits .= str_pad(decbin($v), 5, '0', STR_PAD_LEFT); } $o = ''; foreach (str_split($bits, 8) as $by) if (strlen($by) === 8) $o .= chr(bindec($by)); return $o; }
+function b32_secret(): string { $a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $s = ''; foreach (str_split(random_bytes(20)) as $c) $s .= $a[ord($c) & 31]; return $s; }
+function totp_code(string $secret, int $t): string { $h = hash_hmac('sha1', pack('N*', 0, $t), b32_decode($secret), true); $o = ord($h[19]) & 15; $n = (unpack('N', substr($h, $o, 4))[1] & 0x7fffffff) % 1000000; return str_pad((string)$n, 6, '0', STR_PAD_LEFT); }
+function totp_verify(string $secret, string $code): bool { $code = preg_replace('/\D/', '', $code); if (strlen($code) !== 6 || $secret === '') return false; $t = intdiv(time(), 30); for ($i = -1; $i <= 1; $i++) if (hash_equals(totp_code($secret, $t + $i), $code)) return true; return false; }
+
+/* ---------------- Daily database backups (kept 7 days, outside public_html) ---------------- */
+define('BACKUP_DIR', dirname(__DIR__, 2) . '/lmserp-backups');
+function backup_now(): string {
+    if (!is_dir(BACKUP_DIR)) mkdir(BACKUP_DIR, 0700, true);
+    $file = BACKUP_DIR . '/backup-' . date('Y-m-d-His') . '.sql.gz'; $gz = gzopen($file, 'w6');
+    gzwrite($gz, "-- LMS ERP backup " . date('c') . "\nSET FOREIGN_KEY_CHECKS=0;\n");
+    foreach (db()->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $t) {
+        $c = db()->query("SHOW CREATE TABLE `$t`")->fetch(PDO::FETCH_NUM)[1];
+        gzwrite($gz, "\nDROP TABLE IF EXISTS `$t`;\n$c;\n");
+        $st = db()->query("SELECT * FROM `$t`");
+        while ($r = $st->fetch(PDO::FETCH_NUM)) gzwrite($gz, "INSERT INTO `$t` VALUES(" . implode(',', array_map(fn($v) => $v === null ? 'NULL' : db()->quote((string)$v), $r)) . ");\n");
+    }
+    gzwrite($gz, "SET FOREIGN_KEY_CHECKS=1;\n"); gzclose($gz); @chmod($file, 0600);
+    $all = glob(BACKUP_DIR . '/backup-*.sql.gz') ?: []; rsort($all); foreach (array_slice($all, 7) as $old) @unlink($old);
+    q('REPLACE INTO settings(k,v) VALUES("last_backup",?)', [date('Y-m-d')]);
+    return basename($file);
+}
+function run_daily_backup(): void { if (setting('last_backup') !== date('Y-m-d')) { try { backup_now(); } catch (Throwable $e) { error_log('backup failed: ' . $e->getMessage()); } } }
 
 function teacher_pct(): float { return max(0, min(100, (float)setting('teacher_share', '50'))); }
 function teacher_balance(int $tid): array {

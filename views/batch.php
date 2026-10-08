@@ -11,7 +11,7 @@ $recent = all('SELECT att_date,SUM(status IN ("P","L")) p,COUNT(*) t FROM attend
 <div class="hero"><div class="muted-l"><?= e($b['ctitle']) ?><?= $b['tname'] ? ' · ' . e($b['tname']) : '' ?></div><div class="big sm"><?= e($b['name']) ?></div>
   <div class="muted-l">📅 <?= e(str_replace(',', ' · ', $b['days'])) ?><?= batch_time($b) ? ' &nbsp; 🕒 ' . batch_time($b) : '' ?><?= $b['room'] ? ' &nbsp; 📍 ' . e($b['room']) : '' ?></div>
   <div class="split"><div><b><?= count($sts) ?></b><span>Students</span></div><div><b><?= $days ?></b><span>Classes held</span></div></div></div>
-<div class="quick"><a href="?p=attendance&id=<?= $id ?>">✅ Mark attendance</a><a href="?p=batch_edit&id=<?= $id ?>">✏️ Edit</a><?php if ($b['meet_link']): ?><a href="<?= e($b['meet_link']) ?>" target="_blank" rel="noopener">🎥 Online class</a><?php endif ?><a href="?p=att_report&id=<?= $id ?>">📊 Monthly report</a></div>
+<div class="quick"><a href="?p=attendance&id=<?= $id ?>">✅ Mark attendance</a><a href="?p=batch_edit&id=<?= $id ?>">✏️ Edit</a><?php if ($b['meet_link']): ?><a href="<?= e(safe_link($b['meet_link'])) ?>" target="_blank" rel="noopener">🎥 Online class</a><?php endif ?><a href="?p=att_report&id=<?= $id ?>">📊 Monthly report</a></div>
 
 <h2>Students</h2>
 <div class="list"><?php foreach ($sts as $s): $pc = $s['t'] ? round($s['p'] * 100 / $s['t']) : null; ?>

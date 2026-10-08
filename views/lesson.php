@@ -31,7 +31,7 @@ $yt = $l['video_url'] ? youtube_id($l['video_url']) : null;
   <div class="video"><video src="<?= e($l['video_url']) ?>" controls playsinline></video></div>
 <?php endif ?>
 <article class="content card"><h1><?= e($l['title']) ?></h1><?= nl2br(e($l['content'])) ?>
-<?php if ($l['attachment_url']): ?><p><a class="btn ghost" href="<?= e($l['attachment_url']) ?>" target="_blank" rel="noopener">📎 Open attachment</a></p><?php endif ?>
+<?php if ($l['attachment_url']): ?><p><a class="btn ghost" href="<?= e(safe_link($l['attachment_url'])) ?>" target="_blank" rel="noopener">📎 Open attachment</a></p><?php endif ?>
 </article>
 <?php if ($manage): ?><div class="quick"><a href="?p=lesson_edit&id=<?= $id ?>">✏️ Edit lesson</a></div><?php endif ?>
 <div class="pager">

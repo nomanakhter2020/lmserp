@@ -25,6 +25,7 @@ $items = [
   ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
   ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
   ['biometric', '👆', 'Fingerprint login', true],
+  ['security', '🔐', role('admin') ? 'Security & backups' : 'Two-step verification', true],
   ['help', '❓', 'Help & guides', true],
   ['site', '🌐', 'Website', true],
   ['profile', '👤', 'My profile', true],
@@ -34,7 +35,7 @@ $items = [
 <?php foreach ($items as [$k, $i, $l, $show]): if (!$show || !view_on($k)) continue; ?>
   <a class="row" href="?p=<?= $k ?>"><span class="mi"><?= $i ?></span><b class="grow"><?= $l ?></b><span>›</span></a>
 <?php endforeach ?>
-  <a class="row" href="?p=logout"><span class="mi">🚪</span><b class="grow neg">Log out</b></a>
+  <a class="row" href="?p=logout&t=<?= csrf() ?>"><span class="mi">🚪</span><b class="grow neg">Log out</b></a>
 </div>
 <p class="install-hint" hidden><button class="btn block ghost" id="installBtn">📲 Install app</button></p>
 <div class="sheet" id="installSheet" hidden><div class="sheet-card">

@@ -1,12 +1,13 @@
 Options -Indexes
 DirectoryIndex index.php
 
-<FilesMatch "\.(sql|gitignore)$|^README\.md$">
+<FilesMatch "\.(sql|gz|log|bak|gitignore|py|md)$">
   Require all denied
 </FilesMatch>
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(inc|views)/ - [F,L]
+  RewriteRule ^(inc|views|tools)/ - [F,L]
+  RewriteRule (^|/)\.(git|env|ht) - [F,L]
   RewriteCond %{HTTPS} !=on
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
   RewriteRule ^blog/?$ index.php?p=blog [QSA,L]
@@ -24,6 +25,8 @@ DirectoryIndex index.php
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
   Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header unset X-Powered-By
   <FilesMatch "sw\.js$">
     Header set Cache-Control "no-cache"
   </FilesMatch>

@@ -10,4 +10,4 @@ $me = user(); $title = 'My profile'; $back = '?p=more';
   <label>Current password<input name="current" type="password" autocomplete="current-password"></label>
   <label>New password<input name="password" type="password" minlength="6" autocomplete="new-password"></label>
   <button class="btn block">Save</button></form>
-<a class="btn danger block" href="?p=logout">Log out</a>
+<a class="btn danger block" href="?p=logout&t=<?= csrf() ?>">Log out</a>

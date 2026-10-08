@@ -1,6 +1,7 @@
 <?php
 require_role('admin', 'teacher');
 $u = one('SELECT * FROM users WHERE id=?', [$id]);
+if ($u && role('teacher') && (int)$u['id'] !== (int)user()['id'] && !val('SELECT 1 FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? AND c.teacher_id=?', [$u['id'], user()['id']])) $u = null;
 if (!$u) { echo '<p class="empty">Not found</p>'; return; }
 $title = $u['name']; $back = '?p=users&role=' . $u['role'];
 $me = user();

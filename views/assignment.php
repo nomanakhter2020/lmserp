@@ -12,7 +12,7 @@ $late = $a['due_at'] && strtotime($a['due_at']) < time();
   <h1 style="margin-top:8px"><?= e($a['title']) ?></h1>
   <small><?= $a['due_at'] ? '⏰ Due ' . date('l, d M Y g:i a', strtotime($a['due_at'])) . ($late ? ' (closed)' : '') : 'No deadline' ?> · <?= $a['max_marks'] ?> marks</small>
   <?php if ($a['instructions']): ?><div class="content" style="margin-top:12px"><?= nl2br(e($a['instructions'])) ?></div><?php endif ?>
-  <?php if ($a['attachment_url']): ?><p><a class="btn sm ghost" href="<?= e($a['attachment_url']) ?>" target="_blank" rel="noopener">📎 Open attachment</a></p><?php endif ?>
+  <?php if ($a['attachment_url']): ?><p><a class="btn sm ghost" href="<?= e(safe_link($a['attachment_url'])) ?>" target="_blank" rel="noopener">📎 Open attachment</a></p><?php endif ?>
   <?php if ($manage): ?><div class="quick" style="margin:10px 0 0"><a href="?p=assign_edit&id=<?= $id ?>">✏️ Edit</a></div><?php endif ?>
 </div>
 

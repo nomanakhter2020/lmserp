@@ -11,7 +11,7 @@ $title = $id ? 'Edit lesson' : 'New lesson'; $back = "?p=course&id={$c['id']}";
   <label>Lesson title<input name="title" value="<?= e($l['title']) ?>" required></label>
   <label>Video URL <small>(YouTube link or .mp4)</small><input name="video_url" type="url" value="<?= e($l['video_url']) ?>" placeholder="https://youtu.be/…"></label>
   <label>Lesson notes<textarea name="content" rows="8"><?= e($l['content']) ?></textarea></label>
-  <label>Attachment URL <small>(PDF, Drive link…)</small><input name="attachment_url" type="url" value="<?= e($l['attachment_url']) ?>"></label>
+  <label>Attachment URL <small>(PDF, Drive link…)</small><input name="attachment_url" type="url" value="<?= e(safe_link($l['attachment_url'])) ?>"></label>
   <label>Order<input name="sort" type="number" value="<?= (int)$l['sort'] ?>"></label>
   <button class="btn block">Save lesson</button>
 </form>

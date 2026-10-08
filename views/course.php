@@ -64,7 +64,7 @@ $pc = $en ? course_progress((int)$me['id'], $id) : 0;
 <?php endif ?>
 
 <?php if ($en && !$manage && ($mb = one('SELECT b.* FROM batch_students s JOIN batches b ON b.id=s.batch_id WHERE s.user_id=? AND b.course_id=?', [$me['id'], $id]))): $ap = att_percent((int)$me['id'], (int)$mb['id']); ?>
-<div class="card"><div class="rowhead"><b>🗓️ <?= e($mb['name']) ?></b><?php if ($ap !== null): ?><span class="pill <?= $ap >= 75 ? 'ok' : 'warn' ?>">Attendance <?= $ap ?>%</span><?php endif ?></div><small><?= e(str_replace(',', ' · ', $mb['days'])) ?><?= batch_time($mb) ? ' · ' . batch_time($mb) : '' ?><?= $mb['room'] ? ' · ' . e($mb['room']) : '' ?></small><?php if ($mb['meet_link']): ?><a class="btn sm" style="margin-top:8px" href="<?= e($mb['meet_link']) ?>" target="_blank" rel="noopener">🎥 Join online class</a><?php endif ?></div>
+<div class="card"><div class="rowhead"><b>🗓️ <?= e($mb['name']) ?></b><?php if ($ap !== null): ?><span class="pill <?= $ap >= 75 ? 'ok' : 'warn' ?>">Attendance <?= $ap ?>%</span><?php endif ?></div><small><?= e(str_replace(',', ' · ', $mb['days'])) ?><?= batch_time($mb) ? ' · ' . batch_time($mb) : '' ?><?= $mb['room'] ? ' · ' . e($mb['room']) : '' ?></small><?php if ($mb['meet_link']): ?><a class="btn sm" style="margin-top:8px" href="<?= e(safe_link($mb['meet_link'])) ?>" target="_blank" rel="noopener">🎥 Join online class</a><?php endif ?></div>
 <?php endif ?>
 <?php if ($en && !$manage): $cc = val('SELECT code FROM certificates WHERE user_id=? AND course_id=? AND revoked=0', [$me['id'], $id]); ?>
   <?php if ($cc): ?><a class="alert" href="?p=cert&c=<?= e($cc) ?>" target="_blank" style="display:block">🎓 <b>Your certificate is ready</b> — view, print or share ›</a>

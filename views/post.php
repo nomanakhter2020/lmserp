@@ -2,7 +2,7 @@
 $slug = preg_replace('/[^a-z0-9-]/', '', strtolower((string)get('slug')));
 $p = one('SELECT p.*,u.name author,u.id aid FROM posts p LEFT JOIN users u ON u.id=p.author_id WHERE slug=?', [$slug]);
 $me = user();
-if (!$p || (!$p['published'] && !($me && in_array($me['role'], ['admin', 'teacher'], true)))) { http_response_code(404); $pageTitle = 'Article not found'; $pageDesc = ''; require __DIR__ . '/_site_head.php'; echo '<main class="container sec-sm center"><h1>Article not found</h1><p><a class="btn" href="blog">Back to blog</a></p></main>'; require __DIR__ . '/_site_foot.php'; return; }
+if (!$p || (!$p['published'] && !($me && ($me['role'] === 'admin' || (int)$me['id'] === (int)$p['aid'])))) { http_response_code(404); $pageTitle = 'Article not found'; $pageDesc = ''; require __DIR__ . '/_site_head.php'; echo '<main class="container sec-sm center"><h1>Article not found</h1><p><a class="btn" href="blog">Back to blog</a></p></main>'; require __DIR__ . '/_site_foot.php'; return; }
 if ($p['published']) q('UPDATE posts SET views=views+1 WHERE id=?', [$p['id']]);
 $inst = setting('institute', APP_NAME);
 $pageTitle = $p['title'] . " · $inst";
