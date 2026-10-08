@@ -688,7 +688,7 @@ if ($isPost) {
             elseif (in_array($do, ['reject', 'remove'], true)) q('DELETE FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$tid, $iid]);
             flash('Updated'); redirect(role('teacher') ? '?p=my_insts' : '?p=inst_teachers');
         case 'mall_seed':
-            require_role('admin'); require __DIR__ . '/inc/mall_seed.php'; [$n, $t] = mall_seed(); flash("Demo institutes loaded: $n new ($t total). Institute logins: institute1@demo.lms / institute2@demo.lms — password demo123456"); redirect('?p=insts');
+            require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("mall_mode","1")'); require __DIR__ . '/inc/mall_seed.php'; [$n, $t] = mall_seed(); flash("Demo institutes loaded: $n new ($t total). Institute logins: institute1@demo.lms / institute2@demo.lms — password demo123456"); redirect('?p=insts');
         case 'mall_clear':
             require_role('admin'); require __DIR__ . '/inc/mall_seed.php'; flash('Removed ' . mall_demo_clear() . ' demo institutes'); redirect('?p=modules');
         case 'mall_settings':
