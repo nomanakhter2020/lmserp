@@ -108,7 +108,13 @@ const STAFF_ACTIONS = [
 const STAFF_COMMON_ACTIONS = ['notif_read_all', 'notif_clear', 'profile_save', 'twofa_enable', 'twofa_disable', 'checklist_hide', 'tprofile_save'];
 const SUPER_ONLY_VIEWS = ['settings', 'modules'];
 const SUPER_ONLY_ACTIONS = ['settings_save', 'modules_save', 'mall_settings', 'mall_seed', 'mall_clear', 'backup_now', 'demo_seed', 'shop_seed', 'shop_clear', 'blog_seed', 'guide_seed'];
-function staff_role(): string { $u = user(); return $u && $u['role'] === 'admin' ? ($u['staff_role'] ?: 'admin') : ''; }
+function staff_role(): string {
+    $u = user(); if (!$u || $u['role'] !== 'admin') return '';
+    static $healed = false; // safety: if no Super Admin exists, the first (owner) admin becomes Super Admin
+    if (!$healed && ($u['staff_role'] ?? '') !== 'super') { $healed = true;
+        if (!val('SELECT 1 FROM users WHERE role="admin" AND staff_role="super" AND active=1 LIMIT 1')) { $first = (int)val('SELECT MIN(id) FROM users WHERE role="admin" AND active=1'); q('UPDATE users SET staff_role="super" WHERE id=?', [$first]); if ($first === (int)$u['id']) return 'super'; } }
+    return ($u['staff_role'] ?? '') ?: 'admin';
+}
 function is_super(): bool { return staff_role() === 'super'; }
 function staff_can_view(string $v): bool {
     $s = staff_role(); if ($s === '' || $s === 'super') return true;
