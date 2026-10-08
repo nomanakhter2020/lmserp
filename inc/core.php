@@ -19,8 +19,8 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '2.8.0';
-const DB_VERSION = 17;
+const APP_VERSION = '3.0.0';
+const DB_VERSION = 18;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -87,7 +87,24 @@ function course_progress(int $uid, int $cid): int {
     return (int)round($done * 100 / $total);
 }
 
-function can_manage_course(array $c): bool { return role('admin') || (role('teacher') && (int)$c['teacher_id'] === (int)user()['id']); }
+function can_manage_course(array $c): bool {
+    if (role('admin')) return true;
+    if (role('teacher') && (int)($c['teacher_id'] ?? 0) === (int)user()['id']) return true;
+    if (role('institute') && my_inst_id() && array_key_exists('institution_id', $c) && (int)$c['institution_id'] === my_inst_id()) return true; // institute manages its own courses
+    return false;
+}
+
+/* ---------------- EduMall: institutions ---------------- */
+const INST_TYPES = ['school' => ['🏫', 'School'], 'college' => ['🎓', 'College'], 'university' => ['🏛️', 'University'], 'academy' => ['📘', 'Academy / Coaching'], 'tuition' => ['👩‍🏫', 'Tuition Centre'], 'institute' => ['💻', 'Skills Institute']];
+const ADM_ST = ['new' => ['New', 'warn'], 'contacted' => ['Contacted', ''], 'admitted' => ['Admitted', 'ok'], 'rejected' => ['Rejected', 'err']];
+function mall(): bool { return setting('mall_mode', '0') === '1'; }
+function my_inst_id(): int { $u = user(); return $u && $u['role'] === 'institute' ? (int)($u['institution_id'] ?? 0) : 0; }
+function my_inst(): ?array { $i = my_inst_id(); return $i ? one('SELECT * FROM institutions WHERE id=?', [$i]) : null; }
+function inst_url(array $i): string { return 'i/' . $i['slug']; }
+function inst_img(array $i, string $f = 'logo'): string { return $i[$f] ? photo_url($i[$f]) : ''; }
+function unique_inst_slug(string $name, int $id = 0): string { $b = slugify($name) ?: 'institute'; $s = $b; $n = 2; while (val('SELECT id FROM institutions WHERE slug=? AND id<>?', [$s, $id])) $s = $b . '-' . $n++; return $s; }
+function teacher_insts(int $tid, string $st = 'active'): array { return all('SELECT i.* FROM teacher_institutions ti JOIN institutions i ON i.id=ti.institution_id WHERE ti.teacher_id=? AND ti.status=? ORDER BY i.name', [$tid, $st]); }
+function inst_teachers(int $iid, string $st = 'active'): array { return all('SELECT u.id,u.name,u.email,u.phone,ti.status,ti.requested_by,(SELECT photo FROM teacher_profiles tp WHERE tp.user_id=u.id) photo,(SELECT headline FROM teacher_profiles tp WHERE tp.user_id=u.id) headline FROM teacher_institutions ti JOIN users u ON u.id=ti.teacher_id WHERE ti.institution_id=? AND ti.status=? ORDER BY u.name', [$iid, $st]); }
 
 // Runs schema.sql (all CREATE IF NOT EXISTS) once per DB_VERSION bump
 function migrate() {
@@ -117,6 +134,11 @@ function migrate() {
         db()->exec("ALTER TABLE orders MODIFY user_id INT NULL");
     if (val("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='payments' AND COLUMN_NAME='user_id'") === 'NO')
         db()->exec("ALTER TABLE payments MODIFY user_id INT NULL");
+    if (!str_contains((string)val("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='role'"), 'institute'))
+        db()->exec("ALTER TABLE users MODIFY role ENUM('admin','teacher','student','parent','institute') NOT NULL DEFAULT 'student'");
+    foreach ([['users', 'institution_id', 'INT NULL'], ['courses', 'institution_id', 'INT NULL']] as [$t, $col, $def])
+        if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?", [$t, $col]))
+            db()->exec("ALTER TABLE $t ADD $col $def");
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='totp_secret'"))
         db()->exec("ALTER TABLE users ADD totp_secret VARCHAR(64) DEFAULT ''");
     foreach ([['products', 'teacher_id', 'INT NULL'], ['products', 'review', "VARCHAR(10) DEFAULT ''"], ['order_items', 'teacher_id', 'INT NULL'], ['order_items', 'teacher_share', 'DECIMAL(10,2) DEFAULT 0']] as [$t, $col, $def])

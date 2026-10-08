@@ -8,6 +8,7 @@ $p = preg_replace('/[^a-z_]/', '', (string)get('p', 'home')); if ($p === '' || $
 $id = (int)($_POST['id'] ?? get('id', 0));
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
 if (!view_on($p)) $p = user() ? 'home' : (mod('website') ? 'home' : 'login');
+if (!mall() && in_array($p, ['insts', 'admissions', 'inst_edit', 'inst_teachers', 'my_insts', 'institutes', 'institute', 'inst_join', 'tutors'], true)) $p = 'home';
 if ($p === 'webauthn' && $isPost) { require __DIR__ . '/inc/webauthn.php'; }
 
 /* ------------------------- ACTIONS (POST) ------------------------- */
@@ -36,11 +37,13 @@ if ($isPost) {
             if (val('SELECT id FROM users WHERE email=?', [post('email')])) { flash('Email already registered', 'err'); redirect('?p=register'); }
             $isP = post('as') === 'parent';
             if ($isP && trim((string)post('child_name')) === '') { flash("Please enter your child's name", 'err'); redirect('?p=register&as=parent'); }
-            q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,?)', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), $isP ? 'parent' : 'student']);
+            $isT = post('as') === 'teacher' && mall();
+            q('INSERT INTO users(name,email,phone,password,role) VALUES(?,?,?,?,?)', [post('name'), post('email'), post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), $isP ? 'parent' : ($isT ? 'teacher' : 'student')]);
             $uid = (int)db()->lastInsertId(); session_regenerate_id(true); $_SESSION['uid'] = $uid;
             if ($isP) { foreach (array_filter(array_map('trim', explode(',', (string)post('child_name')))) as $cn) add_child($uid, $cn);
                 notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New parent registered', post('name') . ' · ' . post('phone'), "?p=user&id=$uid", '👨‍👩‍👧');
                 flash('Welcome! Your children are added — enroll them in a course from Courses.'); }
+            if ($isT) { flash('Welcome! Complete your CV so institutes can find you.'); redirect('?p=tprofile'); }
             redirect('./');
     }
     if (in_array($a, ['store_add', 'store_update', 'store_checkout'], true)) {
@@ -67,6 +70,30 @@ if ($isPost) {
         q('UPDATE orders SET proof=IF(?="",proof,?),txn_ref=?,pay_method=? WHERE id=?', [$proof, $proof, post('txn_ref'), in_array(post('pay_method'), ['JazzCash', 'EasyPaisa', 'Bank'], true) ? post('pay_method') : $o['pay_method'], $id]);
         flash('Payment proof received — we will confirm shortly.'); redirect(order_track_url($o));
     }
+    if ($a === 'admission_apply') { // public admission form on an institute page
+        $in = one('SELECT * FROM institutions WHERE id=? AND status="active"', [$id]); if (!$in) redirect('institutes');
+        $back = inst_url($in);
+        if (post('website') !== '' || (int)val('SELECT COUNT(*) FROM admissions WHERE ip=? AND created_at > NOW() - INTERVAL 1 HOUR', [client_ip()]) >= 5) { flash('Too many applications from this device. Please try later.', 'err'); redirect($back); }
+        $nm = trim((string)post('student_name')); $ph = trim((string)post('phone'));
+        if ($nm === '' || strlen(preg_replace('/\D/', '', $ph)) < 10) { flash('Please enter the student name and a valid phone number.', 'err'); redirect($back . '#apply'); }
+        q('INSERT INTO admissions(institution_id,user_id,student_name,guardian_name,phone,email,class_program,city,message,ip) VALUES(?,?,?,?,?,?,?,?,?,?)', [$in['id'], user()['id'] ?? null, mb_substr($nm, 0, 120), mb_substr((string)post('guardian_name'), 0, 120), mb_substr($ph, 0, 40), mb_substr((string)post('email'), 0, 160), mb_substr((string)post('class_program'), 0, 160), mb_substr((string)post('city'), 0, 80), mb_substr((string)post('message'), 0, 2000), client_ip()]);
+        notify(array_map('intval', array_column(all('SELECT id FROM users WHERE institution_id=? AND role="institute" AND active=1', [$in['id']]), 'id')), 'New admission enquiry', $nm . ' · ' . post('class_program'), '?p=admissions', '📝');
+        flash('Application sent! ' . $in['name'] . ' will contact you soon.'); redirect($back . '#apply');
+    }
+    if ($a === 'inst_register') { // "List your institute"
+        if (!mall()) redirect('./');
+        $email = strtolower(trim((string)post('email')));
+        if (post('website') !== '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen((string)($_POST['password'] ?? '')) < 8 || trim((string)post('inst_name')) === '' || trim((string)post('phone')) === '') { flash('Please fill all fields (password 8+ characters).', 'err'); redirect('?p=inst_join'); }
+        if (val('SELECT id FROM users WHERE email=?', [$email])) { flash('This email is already registered — log in instead.', 'err'); redirect('?p=inst_join'); }
+        $type = isset(INST_TYPES[post('type')]) ? post('type') : 'school';
+        q('INSERT INTO institutions(name,slug,type,city,phone,whatsapp,email,status) VALUES(?,?,?,?,?,?,?,"pending")', [mb_substr(trim(post('inst_name')), 0, 160), unique_inst_slug(post('inst_name')), $type, mb_substr((string)post('city'), 0, 80), post('phone'), post('phone'), $email]);
+        $iid = (int)db()->lastInsertId();
+        q('INSERT INTO users(name,email,phone,password,role,institution_id) VALUES(?,?,?,?,"institute",?)', [mb_substr((string)post('name'), 0, 120) ?: post('inst_name'), $email, post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), $iid]);
+        $uid = (int)db()->lastInsertId(); q('UPDATE institutions SET owner_id=? WHERE id=?', [$uid, $iid]);
+        notify(array_map('intval', array_column(all('SELECT id FROM users WHERE role="admin" AND active=1'), 'id')), 'New institute listing', post('inst_name') . ' · ' . post('city'), '?p=insts', '🏫');
+        login_ok(one('SELECT * FROM users WHERE id=?', [$uid]));
+        flash('Welcome! Complete your profile — your listing goes live after approval.'); redirect('?p=inst_edit');
+    }
     if ($a === 'contact_send') {
         if (post('website') !== '' || (time() - ($_SESSION['last_contact'] ?? 0)) < 30) { flash('Please wait a moment before sending another message.', 'err'); redirect('contact'); }
         if (post('name') === '' || post('message') === '' || (post('email') === '' && post('phone') === '')) { flash('Please enter your name, message and an email or phone.', 'err'); redirect('contact'); }
@@ -78,16 +105,18 @@ if ($isPost) {
     $me = user();
     switch ($a) {
         case 'course_save':
-            require_role('admin', 'teacher');
-            $teacher = role('admin') ? ((int)post('teacher_id') ?: null) : $me['id'];
+            require_role('admin', 'teacher', 'institute');
+            if ($id) { $c = one('SELECT * FROM courses WHERE id=?', [$id]); if (!$c || !can_manage_course($c)) exit('Not allowed'); }
+            if (role('institute')) { $tp = (int)post('teacher_id'); $teacher = $tp && val('SELECT 1 FROM teacher_institutions WHERE teacher_id=? AND institution_id=? AND status="active"', [$tp, my_inst_id()]) ? $tp : null; $instId = my_inst_id(); }
+            elseif (role('admin')) { $teacher = (int)post('teacher_id') ?: null; $instId = (int)post('institution_id') ?: null; }
+            else { $teacher = $me['id']; $ip = (int)post('institution_id'); $instId = $ip && val('SELECT 1 FROM teacher_institutions WHERE teacher_id=? AND institution_id=? AND status="active"', [$me['id'], $ip]) ? $ip : null; }
             $data = [post('title'), post('description'), (int)post('category_id') ?: null, $teacher, (float)post('fee'), post('color', '#4f46e5'), post('published') ? 1 : 0];
             $prog = isset(PROGRAMS[post('program')]) ? post('program') : 'course'; $lvl = post('level');
             try { $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=course_edit' . ($id ? "&id=$id" : '')); }
             if ($id) {
-                $c = one('SELECT * FROM courses WHERE id=?', [$id]); if (!$c || !can_manage_course($c)) exit('Not allowed');
                 q('UPDATE courses SET title=?,description=?,category_id=?,teacher_id=?,fee=?,color=?,published=? WHERE id=?', [...$data, $id]);
             } else { q('INSERT INTO courses(title,description,category_id,teacher_id,fee,color,published) VALUES(?,?,?,?,?,?,?)', $data); $id = db()->lastInsertId(); }
-            q('UPDATE courses SET program=?,level=? WHERE id=?', [$prog, $lvl, $id]);
+            q('UPDATE courses SET program=?,level=?,institution_id=? WHERE id=?', [$prog, $lvl, $instId, $id]);
             if ($cover || post('remove_cover')) {
                 $old = val('SELECT cover FROM courses WHERE id=?', [$id]);
                 if ($old) @unlink(UPLOAD_DIR . '/covers/' . basename($old));
@@ -612,6 +641,58 @@ if ($isPost) {
             require_role('admin'); q('INSERT INTO categories(name) VALUES(?)', [post('name')]); redirect('?p=settings');
         case 'category_delete':
             require_role('admin'); q('DELETE FROM categories WHERE id=?', [$id]); redirect('?p=settings');
+        case 'inst_save':
+            $iid = role('admin') ? $id : my_inst_id(); $in = $iid ? one('SELECT * FROM institutions WHERE id=?', [$iid]) : null;
+            if (!$in || !(role('admin') || role('institute'))) exit('Not allowed');
+            try { $logo = save_cover('logo'); $cover = save_cover('cover'); } catch (RuntimeException $ex) { flash($ex->getMessage(), 'err'); redirect('?p=inst_edit' . (role('admin') ? "&id=$iid" : '')); }
+            $type = isset(INST_TYPES[post('type')]) ? post('type') : $in['type'];
+            q('UPDATE institutions SET name=?,slug=?,type=?,city=?,address=?,about=?,programs=?,facilities=?,phone=?,whatsapp=?,email=?,website=?,fee_min=?,fee_max=?,established=?,admissions_open=? WHERE id=?', [
+                mb_substr(trim((string)post('name')), 0, 160) ?: $in['name'], unique_inst_slug(post('name') ?: $in['name'], $iid), $type, mb_substr((string)post('city'), 0, 80), mb_substr((string)post('address'), 0, 255), (string)post('about'), (string)post('programs'), (string)post('facilities'),
+                mb_substr((string)post('phone'), 0, 40), mb_substr((string)post('whatsapp'), 0, 40), mb_substr((string)post('email'), 0, 160), safe_link(post('website')), max(0, (int)post('fee_min')), max(0, (int)post('fee_max')), (int)post('established') ?: null, post('admissions_open') ? 1 : 0, $iid]);
+            if ($logo) q('UPDATE institutions SET logo=? WHERE id=?', [$logo, $iid]);
+            if ($cover) q('UPDATE institutions SET cover=? WHERE id=?', [$cover, $iid]);
+            flash('Profile saved'); redirect('?p=inst_edit' . (role('admin') ? "&id=$iid" : ''));
+        case 'inst_status':
+            require_role('admin'); $in = one('SELECT * FROM institutions WHERE id=?', [$id]); if (!$in) redirect('?p=insts');
+            if (in_array(post('status'), ['active', 'pending', 'suspended'], true)) q('UPDATE institutions SET status=? WHERE id=?', [post('status'), $id]);
+            if (post('featured') !== '') q('UPDATE institutions SET featured=? WHERE id=?', [post('featured') ? 1 : 0, $id]);
+            if (post('status') === 'active' && $in['status'] !== 'active' && $in['owner_id']) notify((int)$in['owner_id'], 'Your listing is live! 🎉', $in['name'] . ' is now visible on ' . setting('institute', 'EduMall'), '?p=home', '✅');
+            flash('Institute updated'); redirect(post('back') === 'list' ? '?p=insts' : '?p=inst_edit&id=' . $id);
+        case 'admission_status':
+            $ad = one('SELECT * FROM admissions WHERE id=?', [$id]);
+            if (!$ad || !(role('admin') || (int)$ad['institution_id'] === my_inst_id())) exit('Not allowed');
+            if (isset(ADM_ST[post('status')])) q('UPDATE admissions SET status=?,note=? WHERE id=?', [post('status'), mb_substr((string)post('note'), 0, 255), $id]);
+            flash('Updated'); redirect('?p=admissions' . (get('f') ? '&f=' . get('f') : ''));
+        case 'inst_teacher_invite':
+            require_role('institute'); $iid = my_inst_id();
+            $t = one('SELECT * FROM users WHERE email=? AND role="teacher" AND active=1', [strtolower(trim((string)post('email')))]);
+            if (!$t) { flash('No teacher account with that email. Ask the teacher to sign up as a teacher first.', 'err'); redirect('?p=inst_teachers'); }
+            $cur = val('SELECT status FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]);
+            if ($cur === 'pending' && val('SELECT requested_by FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]) === 'teacher') q('UPDATE teacher_institutions SET status="active" WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]);
+            elseif (!$cur || $cur === 'rejected') q('REPLACE INTO teacher_institutions(teacher_id,institution_id,status,requested_by) VALUES(?,?,"pending","institute")', [$t['id'], $iid]);
+            notify((int)$t['id'], 'Invitation to join ' . my_inst()['name'], 'Open My institutions to accept.', '?p=my_insts', '🏫');
+            flash('Invitation sent to ' . $t['name']); redirect('?p=inst_teachers');
+        case 'inst_teacher_request':
+            require_role('teacher'); $in = one('SELECT * FROM institutions WHERE id=? AND status="active"', [$id]); if (!$in) redirect('?p=my_insts');
+            $cur = one('SELECT * FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$me['id'], $id]);
+            if ($cur && $cur['status'] === 'pending' && $cur['requested_by'] === 'institute') q('UPDATE teacher_institutions SET status="active" WHERE teacher_id=? AND institution_id=?', [$me['id'], $id]);
+            elseif (!$cur || $cur['status'] === 'rejected') q('REPLACE INTO teacher_institutions(teacher_id,institution_id,status,requested_by) VALUES(?,?,"pending","teacher")', [$me['id'], $id]);
+            notify(array_map('intval', array_column(all('SELECT id FROM users WHERE institution_id=? AND role="institute"', [$id]), 'id')), 'Teacher wants to join', $me['name'], '?p=inst_teachers', '👩‍🏫');
+            flash('Request sent to ' . $in['name']); redirect('?p=my_insts');
+        case 'inst_teacher_respond': // accept / reject / remove a link (either side, only for own records)
+            $tid = role('teacher') ? (int)$me['id'] : (int)post('teacher_id'); $iid = role('institute') ? my_inst_id() : (int)post('institution_id');
+            if (!(role('teacher') || role('institute')) || !$tid || !$iid) exit('Not allowed');
+            $l = one('SELECT * FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$tid, $iid]); if (!$l) redirect(role('teacher') ? '?p=my_insts' : '?p=inst_teachers');
+            $do = post('do');
+            if ($do === 'accept' && $l['status'] === 'pending' && $l['requested_by'] !== (role('teacher') ? 'teacher' : 'institute')) q('UPDATE teacher_institutions SET status="active" WHERE teacher_id=? AND institution_id=?', [$tid, $iid]);
+            elseif (in_array($do, ['reject', 'remove'], true)) q('DELETE FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$tid, $iid]);
+            flash('Updated'); redirect(role('teacher') ? '?p=my_insts' : '?p=inst_teachers');
+        case 'mall_seed':
+            require_role('admin'); require __DIR__ . '/inc/mall_seed.php'; [$n, $t] = mall_seed(); flash("Demo institutes loaded: $n new ($t total). Institute logins: institute1@demo.lms / institute2@demo.lms — password demo123456"); redirect('?p=insts');
+        case 'mall_clear':
+            require_role('admin'); require __DIR__ . '/inc/mall_seed.php'; flash('Removed ' . mall_demo_clear() . ' demo institutes'); redirect('?p=modules');
+        case 'mall_settings':
+            require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("mall_mode",?)', [post('mall_mode') ? '1' : '0']); flash('Saved'); redirect('?p=modules');
         case 'twofa_enable':
             $sec = (string)($_SESSION['totp_new'] ?? '');
             if ($sec !== '' && totp_verify($sec, (string)post('code'))) { q('UPDATE users SET totp_secret=? WHERE id=?', [$sec, $me['id']]); unset($_SESSION['totp_new']); flash('Two-step verification is ON'); }
@@ -702,6 +783,7 @@ if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
 if (in_array($p, ['store', 'store_product', 'store_cart', 'store_checkout', 'track'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
+if (mall() && in_array($p, ['institutes', 'institute', 'inst_join', 'tutors'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if ($p === 'robots') { header('Content-Type: text/plain'); echo "User-agent: *\nAllow: /\nDisallow: /install.php\nDisallow: /*?p=login\nDisallow: /*?p=register\n\nSitemap: " . abs_url('sitemap.xml') . "\n"; exit; }
 if ($p === 'adstxt') { header('Content-Type: text/plain'); $c = adsense_client(); echo $c ? 'google.com, ' . str_replace('ca-', '', $c) . ", DIRECT, f08c47fec0942fa0\n" : "# AdSense publisher ID not set yet\n"; exit; }
 if ($p === 'sitemap') {
@@ -717,7 +799,7 @@ if ($p === 'sitemap') {
     echo '</urlset>'; exit;
 }
 // Public website: guests landing on the root URL, or anyone via ?p=site
-if (mod('website') && (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site')) { require __DIR__ . '/views/landing.php'; exit; }
+if (mod('website') && (($p === 'home' && !isset($_GET['p']) && !user()) || $p === 'site')) { require __DIR__ . (mall() ? '/views/mall_home.php' : '/views/landing.php'); exit; }
 if ($p === 'logout') { if (hash_equals(csrf(), (string)get('t'))) { $_SESSION = []; session_destroy(); } redirect('?p=login'); }
 if ($p === 'twofa' && (empty($_SESSION['2fa_uid']) || user())) redirect('?p=login');
 if ($p === 'backup_dl') {
@@ -729,6 +811,7 @@ if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register', 'twofa'], true)) require_login();
 
 if (role('admin')) { run_recurring(); run_fee_plans(); run_daily_backup(); }
+if (role('institute') && !in_array($p, ['home', 'admissions', 'inst_teachers', 'inst_edit', 'courses', 'course', 'course_edit', 'lesson', 'more', 'notifications', 'biometric', 'security', 'help', 'profile', 'teacher'], true)) $p = 'home';
 $view = __DIR__ . "/views/$p.php";
 $page = $p;
 if (!is_file($view)) { $p = $page = "home"; $view = __DIR__ . "/views/home.php"; }

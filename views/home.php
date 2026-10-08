@@ -1,5 +1,6 @@
 <?php
 $me = user(); $title = 'Hi, ' . explode(' ', $me['name'])[0];
+if (role('institute')) { require __DIR__ . '/_inst_home.php'; return; }
 $ann = all('SELECT a.*,c.title ct FROM announcements a LEFT JOIN courses c ON c.id=a.course_id
   WHERE a.course_id IS NULL OR a.course_id IN (SELECT course_id FROM enrollments WHERE user_id=?) OR a.course_id IN (SELECT id FROM courses WHERE teacher_id=?) OR ?
   ORDER BY a.id DESC LIMIT 3', [$me['id'], $me['id'], role('admin') ? 1 : 0]);

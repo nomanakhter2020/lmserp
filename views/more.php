@@ -23,6 +23,11 @@ $items = [
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
   ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
+  ['insts', '🏫', 'Institutes' . (role('admin') && mall() && ($pi = (int)val('SELECT COUNT(*) FROM institutions WHERE status="pending"')) ? " ($pi pending)" : ''), role('admin') && mall()],
+  ['admissions', '📝', 'Admission enquiries', role('admin', 'institute') && mall()],
+  ['inst_edit', '✏️', 'Institute profile', role('institute')],
+  ['inst_teachers', '👩‍🏫', 'Our teachers', role('institute')],
+  ['my_insts', '🏫', 'My institutions', role('teacher') && mall()],
   ['tprofile', '🪪', 'My teacher profile (CV)', role('admin', 'teacher')],
   ['biometric', '👆', 'Fingerprint login', true],
   ['security', '🔐', role('admin') ? 'Security & backups' : 'Two-step verification', true],
@@ -32,7 +37,7 @@ $items = [
 ];
 ?>
 <div class="list menu">
-<?php foreach ($items as [$k, $i, $l, $show]): if (!$show || !view_on($k)) continue; ?>
+<?php foreach ($items as [$k, $i, $l, $show]): if (!$show || !view_on($k) || (role('institute') && !in_array($k, ['insts', 'admissions', 'inst_edit', 'inst_teachers', 'notifications', 'biometric', 'security', 'help', 'courses', 'profile'], true))) continue; ?>
   <a class="row" href="?p=<?= $k ?>"><span class="mi"><?= $i ?></span><b class="grow"><?= $l ?></b><span>›</span></a>
 <?php endforeach ?>
   <a class="row" href="?p=logout&t=<?= csrf() ?>"><span class="mi">🚪</span><b class="grow neg">Log out</b></a>

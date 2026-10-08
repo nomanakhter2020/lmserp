@@ -24,7 +24,9 @@ $cta = $me ? '?p=home' : ($canReg ? '?p=register' : '?p=login');
   <div class="container nav-in">
     <a class="brand" href="./"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
     <nav class="links" id="menu">
+      <?php if (mall()): ?><a href="institutes">Institutes</a><a href="institutes?type=school">Schools</a><a href="institutes?type=college">Colleges</a><a href="institutes?type=university">Universities</a><a href="teachers">Teachers</a><a href="blog">Blog</a><?php if (!$me): ?><a href="list-your-institute"><b>List your institute</b></a><?php endif ?><?php else: ?>
       <?php if (mod('lms')): ?><a href="./#courses">Courses</a><?php endif ?><a href="./#teachers">Teachers</a><a href="blog">Blog</a><?php if (mod('shop')): ?><a href="shop">Shop</a><?php endif ?><?php if (mod('shop')): ?><a href="track">Track order</a><?php endif ?><a href="about">About</a><a href="contact">Contact</a>
+      <?php endif ?>
       <?php if ($me): ?><a class="m-only btn" href="?p=home">My dashboard →</a><?php else: ?><a class="m-only btn-o" href="?p=login">Log in</a><a class="m-only btn" href="<?= $cta ?>">Enroll now</a><?php endif ?>
     </nav>
     <div class="nav-cta"><?php if (mod('shop')): ?><a class="cartbtn" href="cart" aria-label="Cart">🛒<?php $cc = cart_count(); if ($cc): ?><i><?= $cc ?></i><?php endif ?></a><?php endif ?><?php if ($me): ?><a class="btn" href="?p=home">My dashboard →</a><?php else: ?><a class="login" href="?p=login">Log in</a><?php if ($canReg): ?><a class="btn" href="?p=register">Enroll now</a><?php endif ?><?php endif ?></div>

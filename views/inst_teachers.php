@@ -1,0 +1,12 @@
+<?php
+require_role('institute'); $iid = my_inst_id(); $title = 'Teachers'; $back = '?p=home';
+$act = inst_teachers($iid); $pend = inst_teachers($iid, 'pending');
+$f = fn($t, $do, $lbl, $cls = 'sm') => '<form method="post" style="display:inline">' . csrf_field() . '<input type="hidden" name="a" value="inst_teacher_respond"><input type="hidden" name="teacher_id" value="' . (int)$t['id'] . '"><input type="hidden" name="do" value="' . $do . '"><button class="btn ' . $cls . '"' . ($do === 'remove' ? ' onclick="return confirm(\'Remove this teacher?\')"' : '') . '>' . $lbl . '</button></form>';
+?>
+<form method="post" class="card"><?= csrf_field() ?><input type="hidden" name="a" value="inst_teacher_invite"><h3 style="margin-top:0">＋ Invite a teacher</h3><p class="muted" style="margin-top:-6px;font-size:13px">Enter the email of a teacher registered on <?= e(setting('institute', 'EduMall')) ?>. Or browse the <a href="teachers" target="_blank">teacher pool</a>.</p><div class="two"><input name="email" type="email" required placeholder="teacher@email.com"><button class="btn">Send invite</button></div></form>
+<?php $req = array_filter($pend, fn($t) => $t['requested_by'] === 'teacher'); $inv = array_filter($pend, fn($t) => $t['requested_by'] === 'institute'); ?>
+<?php if ($req): ?><h2>Requests to join</h2><div class="list"><?php foreach ($req as $t): ?><div class="row"><span class="mi">🙋</span><div class="grow"><b><?= e($t['name']) ?></b><small><?= e($t['headline'] ?: $t['email']) ?> · <a href="?p=teacher&id=<?= $t['id'] ?>" target="_blank">CV ↗</a></small></div><?= $f($t, 'accept', '✓ Accept') ?> <?= $f($t, 'reject', '✕', 'sm ghost') ?></div><?php endforeach ?></div><?php endif ?>
+<h2>Our teachers (<?= count($act) ?>)</h2>
+<div class="list"><?php foreach ($act as $t): ?><div class="row"><span class="mi">👩‍🏫</span><div class="grow"><b><?= e($t['name']) ?></b><small><?= e($t['headline'] ?: $t['email']) ?> · <?= e($t['phone']) ?></small></div><?= $f($t, 'remove', 'Remove', 'sm ghost') ?></div><?php endforeach ?></div>
+<?php if (!$act): ?><p class="empty">No teachers linked yet.</p><?php endif ?>
+<?php if ($inv): ?><h2>Invitations sent</h2><div class="list"><?php foreach ($inv as $t): ?><div class="row"><span class="mi">✉️</span><div class="grow"><b><?= e($t['name']) ?></b><small>Waiting for teacher to accept</small></div><?= $f($t, 'remove', 'Cancel', 'sm ghost') ?></div><?php endforeach ?></div><?php endif ?>

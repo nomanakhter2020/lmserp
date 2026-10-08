@@ -2,7 +2,8 @@
 $me = user(); $title = role('student') ? 'Browse courses' : 'Courses';
 $cat = (int)get('cat'); $s = trim((string)get('s')); $prog = isset(PROGRAMS[get('prog')]) ? get('prog') : '';
 $w = ['1=1']; $pr = [];
-if (role('student')) $w[] = 'c.published=1';
+if (role('student', 'parent')) $w[] = 'c.published=1';
+if (role('institute')) { $w[] = 'c.institution_id=?'; $pr[] = my_inst_id(); }
 $mine = get('mine') === '1';
 if (role('teacher')) { if ($mine) { $w[] = 'c.teacher_id=?'; $pr[] = $me['id']; } else { $w[] = '(c.published=1 OR c.teacher_id=?)'; $pr[] = $me['id']; } }
 if ($cat) { $w[] = 'c.category_id=?'; $pr[] = $cat; }

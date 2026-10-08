@@ -469,3 +469,56 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX(email), INDEX(ip), INDEX(at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+CREATE TABLE IF NOT EXISTS institutions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(160) NOT NULL,
+  slug VARCHAR(180) NOT NULL UNIQUE,
+  type VARCHAR(20) NOT NULL DEFAULT 'school',
+  city VARCHAR(80) DEFAULT '',
+  address VARCHAR(255) DEFAULT '',
+  about TEXT,
+  programs TEXT,
+  facilities TEXT,
+  logo VARCHAR(120) DEFAULT '',
+  cover VARCHAR(120) DEFAULT '',
+  phone VARCHAR(40) DEFAULT '',
+  whatsapp VARCHAR(40) DEFAULT '',
+  email VARCHAR(160) DEFAULT '',
+  website VARCHAR(200) DEFAULT '',
+  fee_min INT DEFAULT 0,
+  fee_max INT DEFAULT 0,
+  established SMALLINT NULL,
+  admissions_open TINYINT(1) DEFAULT 1,
+  status VARCHAR(12) NOT NULL DEFAULT 'pending',
+  featured TINYINT(1) DEFAULT 0,
+  owner_id INT NULL,
+  views INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(status), INDEX(type), INDEX(city)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS teacher_institutions (
+  teacher_id INT NOT NULL,
+  institution_id INT NOT NULL,
+  status VARCHAR(12) NOT NULL DEFAULT 'pending',
+  requested_by VARCHAR(12) DEFAULT 'institute',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(teacher_id, institution_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS admissions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  institution_id INT NOT NULL,
+  user_id INT NULL,
+  student_name VARCHAR(120) NOT NULL,
+  guardian_name VARCHAR(120) DEFAULT '',
+  phone VARCHAR(40) NOT NULL,
+  email VARCHAR(160) DEFAULT '',
+  class_program VARCHAR(160) DEFAULT '',
+  city VARCHAR(80) DEFAULT '',
+  message TEXT,
+  status VARCHAR(12) NOT NULL DEFAULT 'new',
+  note VARCHAR(255) DEFAULT '',
+  ip VARCHAR(45) DEFAULT '',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(institution_id), INDEX(status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
