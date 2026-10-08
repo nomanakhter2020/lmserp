@@ -19,8 +19,8 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '3.1.0';
-const DB_VERSION = 18;
+const APP_VERSION = '3.2.0';
+const DB_VERSION = 19;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -94,6 +94,33 @@ function can_manage_course(array $c): bool {
     return false;
 }
 
+/* ---------------- Staff roles inside admin: super / admin / accountant / hr ---------------- */
+const STAFF_ROLES = ['super' => ['👑', 'Super Admin', 'Everything, including settings, modules, backups and staff'], 'admin' => ['🛠️', 'Admin', 'Day-to-day: courses, people, classes, exams, admissions, shop, website, fees'], 'accountant' => ['💰', 'Accountant', 'Fees, vouchers, payments, expenses, reports, payroll payouts'], 'hr' => ['👥', 'HR Manager', 'Teachers & staff, attendance reports, payroll']];
+const STAFF_COMMON_VIEWS = ['home', 'more', 'notifications', 'profile', 'help', 'biometric', 'security', 'receipt'];
+const STAFF_VIEWS = [
+    'accountant' => ['fees', 'vouchers', 'voucher', 'voucher_gen', 'proofs', 'expenses', 'recurring', 'expense_cats', 'reports', 'payroll', 'slip', 'earnings', 'orders', 'order', 'users', 'user', 'enrollments'],
+    'hr' => ['users', 'user', 'user_edit', 'teachers', 'teacher', 'payroll', 'slip', 'batches', 'batch', 'att_report', 'insts', 'inst_edit'],
+];
+const STAFF_ACTIONS = [
+    'accountant' => ['payment_add', 'proof_review', 'payment_delete', 'expense_add', 'expense_delete', 'recurring_save', 'recurring_delete', 'expcat_add', 'expcat_delete', 'plan_save', 'plan_delete', 'voucher_generate', 'installments_create', 'voucher_pay', 'voucher_cancel', 'voucher_edit', 'enroll_discount', 'slip_pay', 'payout_save', 'payout_delete', 'order_status', 'order_bulk'],
+    'hr' => ['user_save', 'salary_rule', 'slips_generate', 'slip_update', 'slip_delete', 'parent_add', 'parent_unlink'],
+];
+const STAFF_COMMON_ACTIONS = ['notif_read_all', 'notif_clear', 'profile_save', 'twofa_enable', 'twofa_disable', 'checklist_hide', 'tprofile_save'];
+const SUPER_ONLY_VIEWS = ['settings', 'modules'];
+const SUPER_ONLY_ACTIONS = ['settings_save', 'modules_save', 'mall_settings', 'mall_seed', 'mall_clear', 'backup_now', 'demo_seed', 'shop_seed', 'shop_clear', 'blog_seed', 'guide_seed'];
+function staff_role(): string { $u = user(); return $u && $u['role'] === 'admin' ? ($u['staff_role'] ?: 'admin') : ''; }
+function is_super(): bool { return staff_role() === 'super'; }
+function staff_can_view(string $v): bool {
+    $s = staff_role(); if ($s === '' || $s === 'super') return true;
+    if ($s === 'admin') return !in_array($v, SUPER_ONLY_VIEWS, true);
+    return in_array($v, STAFF_COMMON_VIEWS, true) || in_array($v, STAFF_VIEWS[$s] ?? [], true);
+}
+function staff_can_act(string $a): bool {
+    $s = staff_role(); if ($s === '' || $s === 'super') return true;
+    if ($s === 'admin') return !in_array($a, SUPER_ONLY_ACTIONS, true);
+    return in_array($a, STAFF_COMMON_ACTIONS, true) || in_array($a, STAFF_ACTIONS[$s] ?? [], true);
+}
+
 /* ---------------- EduMall: institutions ---------------- */
 const INST_TYPES = ['school' => ['🏫', 'School'], 'college' => ['🎓', 'College'], 'university' => ['🏛️', 'University'], 'academy' => ['📘', 'Academy / Coaching'], 'tuition' => ['👩‍🏫', 'Tuition Centre'], 'institute' => ['💻', 'Skills Institute']];
 const ADM_ST = ['new' => ['New', 'warn'], 'contacted' => ['Contacted', ''], 'admitted' => ['Admitted', 'ok'], 'rejected' => ['Rejected', 'err']];
@@ -139,6 +166,10 @@ function migrate() {
     foreach ([['users', 'institution_id', 'INT NULL'], ['courses', 'institution_id', 'INT NULL']] as [$t, $col, $def])
         if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?", [$t, $col]))
             db()->exec("ALTER TABLE $t ADD $col $def");
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='staff_role'")) {
+        db()->exec("ALTER TABLE users ADD staff_role VARCHAR(12) NOT NULL DEFAULT ''");
+        db()->exec("UPDATE users SET staff_role='super' WHERE role='admin'"); // existing admins keep full access
+    }
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='totp_secret'"))
         db()->exec("ALTER TABLE users ADD totp_secret VARCHAR(64) DEFAULT ''");
     foreach ([['products', 'teacher_id', 'INT NULL'], ['products', 'review', "VARCHAR(10) DEFAULT ''"], ['order_items', 'teacher_id', 'INT NULL'], ['order_items', 'teacher_share', 'DECIMAL(10,2) DEFAULT 0']] as [$t, $col, $def])
@@ -607,7 +638,7 @@ function menu_groups(): array {
   $instOk = ['home', 'courses', 'insts', 'admissions', 'inst_edit', 'inst_teachers', 'notifications', 'biometric', 'security', 'help', 'profile'];
   $out = [];
   foreach ($items as [$k, $i, $l, $show]) {
-    if (!$show || !view_on($k) || (role('institute') && !in_array($k, $instOk, true))) continue;
+    if (!$show || !view_on($k) || !staff_can_view($k) || (role('institute') && !in_array($k, $instOk, true))) continue;
     $out[$grp[$k] ?? 'Main'][] = [$k, $i, $l];
   }
   $ord = array_flip(['Main', 'Academics', 'Finance', 'Shop', 'Website', 'Settings']); uksort($out, fn($a, $b) => ($ord[$a] ?? 9) <=> ($ord[$b] ?? 9));

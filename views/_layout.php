@@ -45,7 +45,7 @@ if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
   <a class="side-brand" href="?p=home"><img src="assets/icon.svg" alt=""><span><?= e($inst) ?></span></a>
   <nav><?php foreach ($__groups as $g => $its): ?><div class="side-g"><?= e($g) ?></div><?php foreach ($its as [$k, $i, $l]): ?><a href="?p=<?= $k ?>" class="<?= ($page === $k || $__cur === $k) ? 'on' : '' ?>"><span><?= $i ?></span><?= $l ?></a><?php endforeach ?><?php endforeach ?>
   <a href="?p=logout&t=<?= csrf() ?>" class="side-out"><span>🚪</span>Log out</a></nav>
-  <div class="side-foot"><?= e($u['name']) ?><small><?= e(ucfirst($u['role'])) ?> · v<?= APP_VERSION ?></small></div>
+  <div class="side-foot"><?= e($u['name']) ?><small><?= e($u['role'] === 'admin' ? (STAFF_ROLES[$u['staff_role'] ?: 'admin'][1] ?? 'Admin') : ucfirst($u['role'])) ?> · v<?= APP_VERSION ?></small></div>
 </aside>
 <header class="top">
   <?php if ($back): ?><a class="backbtn" href="<?= e($back) ?>" aria-label="Back">‹</a><?php endif ?>

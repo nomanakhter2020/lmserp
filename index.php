@@ -103,6 +103,7 @@ if ($isPost) {
     }
     require_login();
     $me = user();
+    if (!staff_can_act($a)) { http_response_code(403); flash('Your role does not have access to this.', 'err'); redirect('?p=home'); }
     switch ($a) {
         case 'course_save':
             require_role('admin', 'teacher', 'institute');
@@ -200,6 +201,11 @@ if ($isPost) {
         case 'user_save':
             require_role('admin');
             $role = in_array(post('role'), ['admin', 'teacher', 'student', 'parent'], true) ? post('role') : 'student';
+            $target = $id ? one('SELECT * FROM users WHERE id=?', [$id]) : null;
+            if (!is_super() && ($role === 'admin' || ($target && $target['role'] === 'admin'))) { flash('Only the Super Admin can create or change staff accounts.', 'err'); redirect($id ? "?p=user&id=$id" : '?p=users'); }
+            if (staff_role() === 'hr' && !in_array($role, ['teacher'], true) && !($target && $target['role'] === $role && $role === 'teacher')) { flash('HR can manage teacher accounts only.', 'err'); redirect('?p=users&role=teacher'); }
+            $sr = $role === 'admin' ? (isset(STAFF_ROLES[post('staff_role')]) ? post('staff_role') : 'admin') : '';
+            if ($target && (int)$target['id'] === (int)$me['id'] && $sr !== 'super' && $target['staff_role'] === 'super' && !val('SELECT COUNT(*) FROM users WHERE role="admin" AND staff_role="super" AND active=1 AND id<>?', [$id])) { flash('You are the only Super Admin — you cannot remove your own Super Admin role.', 'err'); redirect("?p=user&id=$id"); }
             if ($id) {
                 q('UPDATE users SET name=?,email=?,phone=?,role=?,active=? WHERE id=?', [post('name'), post('email'), post('phone'), $role, post('active') ? 1 : 0, $id]);
                 if ((string)($_POST['password'] ?? '') !== '') q('UPDATE users SET password=? WHERE id=?', [password_hash($_POST['password'], PASSWORD_DEFAULT), $id]);
@@ -208,6 +214,7 @@ if ($isPost) {
                 q('INSERT INTO users(name,email,phone,role,password) VALUES(?,?,?,?,?)', [post('name'), post('email'), post('phone'), $role, password_hash($_POST['password'] ?: bin2hex(random_bytes(4)), PASSWORD_DEFAULT)]);
                 $id = db()->lastInsertId();
             }
+            q('UPDATE users SET staff_role=? WHERE id=?', [$sr, $id]);
             flash('User saved'); redirect("?p=user&id=$id");
         case 'payment_add':
             require_role('admin');
@@ -830,6 +837,8 @@ if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register', 'twofa'], true)) require_login();
 
 if (role('admin')) { run_recurring(); run_fee_plans(); run_daily_backup(); }
+if (staff_role() === 'hr' && $p === 'home') $p = 'users';
+if (!staff_can_view($p)) { flash('Your role does not have access to that page.', 'err'); $p = staff_role() === 'hr' ? 'users' : 'home'; }
 if (role('institute') && !in_array($p, ['home', 'admissions', 'inst_teachers', 'inst_edit', 'courses', 'course', 'course_edit', 'lesson', 'more', 'notifications', 'biometric', 'security', 'help', 'profile', 'teacher'], true)) $p = 'home';
 $view = __DIR__ . "/views/$p.php";
 $page = $p;

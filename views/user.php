@@ -2,6 +2,7 @@
 require_role('admin', 'teacher');
 $u = one('SELECT * FROM users WHERE id=?', [$id]);
 if ($u && role('teacher') && (int)$u['id'] !== (int)user()['id'] && !val('SELECT 1 FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? AND c.teacher_id=?', [$u['id'], user()['id']])) $u = null;
+if ($u && ($u['staff_role'] ?? '') === 'super' && !is_super()) $u = null; // the super admin is invisible to everyone else
 if (!$u) { echo '<p class="empty">Not found</p>'; return; }
 $title = $u['name']; $back = '?p=users&role=' . $u['role'];
 $me = user();
@@ -15,7 +16,7 @@ $wa = preg_replace('/\D/', '', $u['phone']); if (str_starts_with($wa, '0')) $wa 
 ?>
 <div class="card profile">
   <div class="avatar lg"><?= e(mb_strtoupper(mb_substr($u['name'], 0, 1))) ?></div>
-  <div><b><?= e($u['name']) ?></b><small><?= ucfirst($u['role']) ?> · <?= e($u['email']) ?></small><small><?= e($u['phone']) ?></small></div>
+  <div><b><?= e($u['name']) ?></b><small><?= $u['role'] === 'admin' ? e(STAFF_ROLES[$u['staff_role'] ?: 'admin'][1] ?? 'Admin') : ucfirst($u['role']) ?> · <?= e($u['email']) ?></small><small><?= e($u['phone']) ?></small></div>
 </div>
 <div class="quick">
   <?php if ($wa): ?><a href="https://wa.me/<?= $wa ?>" target="_blank" rel="noopener">💬 WhatsApp</a><a href="tel:<?= e($u['phone']) ?>">📞 Call</a><?php endif ?>
