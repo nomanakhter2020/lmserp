@@ -55,7 +55,7 @@ if ($step === 'login') {
     if (!$ok) wa_out(['error' => 'Verification failed'], 400);
     if ($count > 0 && $count <= (int)$cr['sign_count']) wa_out(['error' => 'Security check failed'], 400);
     q('UPDATE webauthn_creds SET sign_count=?,last_used=NOW() WHERE id=?', [$count, $cr['id']]);
-    session_regenerate_id(true); $_SESSION['uid'] = (int)$cr['user_id'];
+    session_regenerate_id(true); unset($_SESSION['csrf']); $_SESSION['uid'] = (int)$cr['user_id']; $_SESSION['via'] = 'passkey';
     wa_out(['ok' => true, 'go' => './']);
 }
 if ($step === 'remove') {

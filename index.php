@@ -29,7 +29,7 @@ if ($isPost) {
             if (!$uid || time() - (int)($_SESSION['2fa_at'] ?? 0) > 300) { unset($_SESSION['2fa_uid']); flash('Session expired, log in again', 'err'); redirect('?p=login'); }
             $u = one('SELECT * FROM users WHERE id=? AND active=1', [$uid]);
             if ($u && login_blocked($u['email'])) { flash('Too many attempts. Wait 15 minutes.', 'err'); redirect('?p=login'); }
-            if ($u && totp_verify($u['totp_secret'], (string)post('code'))) { login_ok($u); redirect('./'); }
+            if ($u && totp_verify($u['totp_secret'], (string)post('code'))) { login_ok($u, '2fa'); redirect('./'); }
             if ($u) login_failed($u['email']); flash('Wrong code, try again', 'err'); redirect('?p=twofa');
         case 'register':
             if (setting('allow_register', '1') !== '1') redirect('?p=login');
@@ -103,6 +103,7 @@ if ($isPost) {
     }
     require_login();
     $me = user();
+    if (must_setup_2fa() && !in_array($a, ['twofa_enable'], true)) { flash('Set up two-step verification first.', 'err'); redirect('?p=security'); }
     if (!staff_can_act($a)) { http_response_code(403); flash('Your role does not have access to this.', 'err'); redirect('?p=home'); }
     switch ($a) {
         case 'course_save':
@@ -719,10 +720,11 @@ if ($isPost) {
             require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("mall_mode",?)', [post('mall_mode') ? '1' : '0']); flash('Saved'); redirect('?p=modules');
         case 'twofa_enable':
             $sec = (string)($_SESSION['totp_new'] ?? '');
-            if ($sec !== '' && totp_verify($sec, (string)post('code'))) { q('UPDATE users SET totp_secret=? WHERE id=?', [$sec, $me['id']]); unset($_SESSION['totp_new']); flash('Two-step verification is ON'); }
+            if ($sec !== '' && totp_verify($sec, (string)post('code'))) { q('UPDATE users SET totp_secret=? WHERE id=?', [$sec, $me['id']]); unset($_SESSION['totp_new']); $_SESSION['via'] = '2fa'; flash('Two-step verification is ON'); }
             else flash('Code did not match — check the time on your phone and try again', 'err');
             redirect('?p=security');
         case 'twofa_disable':
+            if (is_super()) { flash('Super Admin must keep two-step verification on. Use fingerprint login for one-touch sign in.', 'err'); redirect('?p=security'); }
             if (!password_verify((string)($_POST['password'] ?? ''), $me['password'])) { flash('Wrong password', 'err'); redirect('?p=security'); }
             q('UPDATE users SET totp_secret="" WHERE id=?', [$me['id']]); flash('Two-step verification turned off'); redirect('?p=security');
         case 'backup_now':
@@ -852,6 +854,7 @@ if (in_array($p, ['login', 'register'], true) && user()) redirect('./?p=home');
 if (!in_array($p, ['login', 'register', 'twofa'], true)) require_login();
 
 if (role('admin')) { run_recurring(); run_fee_plans(); run_daily_backup(); }
+if (must_setup_2fa() && $p !== 'security') { flash('For your security, set up two-step verification to continue.', 'err'); $p = 'security'; }
 if (staff_role() === 'hr' && $p === 'home') $p = 'users';
 if (!staff_can_view($p)) { flash('Your role does not have access to that page.', 'err'); $p = staff_role() === 'hr' ? 'users' : 'home'; }
 if (role('institute') && !in_array($p, ['home', 'admissions', 'inst_teachers', 'inst_edit', 'courses', 'course', 'course_edit', 'lesson', 'more', 'notifications', 'biometric', 'security', 'help', 'profile', 'teacher'], true)) $p = 'home';

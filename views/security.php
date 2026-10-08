@@ -9,7 +9,7 @@ $uri = 'otpauth://totp/' . rawurlencode(setting('institute', APP_NAME) . ':' . $
   <h3 style="margin-top:0">🔐 Two-step verification <?= $on ? '<span class="pill ok">ON</span>' : '<span class="pill warn">OFF</span>' ?></h3>
   <?php if ($on): ?>
     <p class="muted">When you log in with your password, the app also asks for the 6-digit code from your authenticator app. Fingerprint login stays one-touch.</p>
-    <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="twofa_disable"><label>Your password (to turn off)<input name="password" type="password" required></label><button class="btn ghost block">Turn off</button></form>
+    <?php if (!is_super()): ?><form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="twofa_disable"><label>Your password (to turn off)<input name="password" type="password" required></label><button class="btn ghost block">Turn off</button></form><?php else: ?><p class="muted" style="font-size:13px">Required for your account. Password sign-in asks for the code; fingerprint / Face ID sign-in goes straight in.</p><?php endif ?>
   <?php else: ?>
     <p class="muted">Protects your account even if someone learns your password<?= role('admin') ? ' — strongly recommended for admins' : '' ?>.</p>
     <ol style="padding-left:18px;line-height:1.7"><li>Install <b>Google Authenticator</b> or <b>Microsoft Authenticator</b> on your phone.</li><li>Tap ＋ → <b>Scan a QR code</b> and scan this code (or enter the key manually).</li><li>Type the 6-digit code shown in the app below.</li></ol>

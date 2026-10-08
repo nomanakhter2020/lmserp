@@ -19,7 +19,7 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '3.4.0';
+const APP_VERSION = '3.4.1';
 const DB_VERSION = 19;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
@@ -589,7 +589,9 @@ function login_blocked(string $email): bool {
         || (int)val('SELECT COUNT(*) FROM login_attempts WHERE ip=? AND at > NOW() - INTERVAL 15 MINUTE', [client_ip()]) >= 20;
 }
 function login_failed(string $email): void { q('INSERT INTO login_attempts(email,ip) VALUES(?,?)', [strtolower(mb_substr($email, 0, 160)), client_ip()]); }
-function login_ok(array $u): void { q('DELETE FROM login_attempts WHERE email=?', [strtolower($u['email'])]); session_regenerate_id(true); unset($_SESSION['csrf'], $_SESSION['2fa_uid']); $_SESSION['uid'] = (int)$u['id']; }
+function login_ok(array $u, string $via = 'password'): void { q('DELETE FROM login_attempts WHERE email=?', [strtolower($u['email'])]); session_regenerate_id(true); unset($_SESSION['csrf'], $_SESSION['2fa_uid']); $_SESSION['uid'] = (int)$u['id']; $_SESSION['via'] = $via; }
+// Super Admin who signed in with a password must have two-step verification set up before using the portal
+function must_setup_2fa(): bool { $u = user(); return $u && is_super() && empty($_SESSION['imp_from']) && ($_SESSION['via'] ?? 'password') === 'password' && empty($u['totp_secret']); }
 
 /* ---------------- TOTP two-step verification (Google Authenticator) ---------------- */
 function b32_decode(string $b): string { $a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $bits = ''; foreach (str_split(strtoupper(rtrim($b, '='))) as $c) { $v = strpos($a, $c); if ($v === false) continue; $bits .= str_pad(decbin($v), 5, '0', STR_PAD_LEFT); } $o = ''; foreach (str_split($bits, 8) as $by) if (strlen($by) === 8) $o .= chr(bindec($by)); return $o; }
