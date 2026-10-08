@@ -245,3 +245,4 @@ details p{color:var(--mu);margin:12px 0 0}
 .icourses{display:grid;gap:10px}.icourses a{display:flex;gap:12px;align-items:center;border:1px solid var(--ln);border-radius:14px;padding:10px;background:#fff}.icourses .grow{flex:1;min-width:0;display:flex;flex-direction:column}.icourses small{color:var(--mu)}
 .icc{width:64px;height:44px;border-radius:10px;flex:none;background:#eef0fb center/cover}.icourses .go{font-size:22px;color:var(--mu)}
 @media(max-width:760px){.ibadge{font-size:10.5px;padding:5px 7px;top:8px;left:8px}.ibadge.open{top:auto;bottom:8px;right:8px;left:auto}}
+.pwwrap{position:relative;display:block}.pwwrap input{padding-right:46px!important;width:100%}.pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;padding:8px;cursor:pointer;color:#8a8fa8;display:grid;place-items:center;margin:0}.pweye:hover{color:#4f46e5}.pweye svg{width:20px;height:20px}

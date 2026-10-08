@@ -13,7 +13,7 @@ $cnt = array_column(all('SELECT status,COUNT(*) n FROM institutions GROUP BY sta
   <div class="two"><label>Type<select name="type"><?php foreach (INST_TYPES as $k => [$ic, $l]): ?><option value="<?= $k ?>"><?= $ic ?> <?= $l ?></option><?php endforeach ?></select></label><label>City<input name="city"></label></div>
   <label>Phone / WhatsApp<input name="phone" inputmode="tel"></label>
   <p class="muted" style="font-size:13px;margin:4px 0 8px">Optional — give the institute its own login to manage admissions, teachers and courses:</p>
-  <div class="two"><label>Login email<input name="email" type="email" autocomplete="off"></label><label>Password <small>(8+)</small><input name="password" type="text" minlength="8" autocomplete="new-password"></label></div>
+  <div class="two"><label>Login email<input name="email" type="email" autocomplete="off"></label><label>Password <small>(8+)</small><input name="password" type="password" minlength="8" autocomplete="new-password"></label></div>
   <button class="btn block">Create institute</button>
 </form></details>
 <form class="search"><input type="hidden" name="p" value="insts"><input name="s" value="<?= e($s) ?>" placeholder="Search name or city"></form>

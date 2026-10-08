@@ -31,4 +31,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <label>Name<input name="name" required></label>
 <label>Email<input name="email" type="email" required></label>
 <label>Password<input name="password" type="password" minlength="6" required></label>
-<button class="btn">Install</button></form></body></html>
+<button class="btn">Install</button></form><script src="assets/pw.js"></script></body></html>

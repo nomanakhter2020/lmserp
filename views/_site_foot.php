@@ -21,4 +21,5 @@ $cats = all('SELECT category,COUNT(*) n FROM posts WHERE published=1 GROUP BY ca
 try{if(!localStorage.getItem('ck'))document.getElementById('cookie').hidden=false}catch(e){document.getElementById('cookie').hidden=false}
 document.querySelectorAll('#menu a').forEach(a=>a.addEventListener('click',()=>document.body.classList.remove('open')));
 </script>
+<script src="assets/pw.js?v=<?= APP_VERSION ?>"></script>
 </body></html>

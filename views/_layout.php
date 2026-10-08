@@ -65,5 +65,6 @@ if ($u && $u['role'] === 'student' && $page === 'course') $active = 'my';
 <?php endforeach ?>
 </nav>
 <?php endif ?>
+<script src="assets/pw.js?v=<?= APP_VERSION ?>"></script>
 <script src="assets/app.js?v=<?= APP_VERSION ?>"></script>
 </body></html>
