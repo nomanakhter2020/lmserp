@@ -8,7 +8,7 @@ $p = preg_replace('/[^a-z_]/', '', (string)get('p', 'home')); if ($p === '' || $
 $id = (int)($_POST['id'] ?? get('id', 0));
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
 if (!view_on($p)) $p = user() ? 'home' : (mod('website') ? 'home' : 'login');
-if (!mall() && in_array($p, ['insts', 'admissions', 'inst_edit', 'inst_teachers', 'my_insts', 'institutes', 'institute', 'inst_join', 'tutors'], true)) $p = 'home';
+if (!mall() && in_array($p, ['admissions', 'inst_edit', 'inst_teachers', 'my_insts', 'institutes', 'institute', 'inst_join', 'tutors'], true)) $p = 'home';
 if ($p === 'webauthn' && $isPost) { require __DIR__ . '/inc/webauthn.php'; }
 
 /* ------------------------- ACTIONS (POST) ------------------------- */
@@ -652,6 +652,17 @@ if ($isPost) {
             if ($logo) q('UPDATE institutions SET logo=? WHERE id=?', [$logo, $iid]);
             if ($cover) q('UPDATE institutions SET cover=? WHERE id=?', [$cover, $iid]);
             flash('Profile saved'); redirect('?p=inst_edit' . (role('admin') ? "&id=$iid" : ''));
+        case 'inst_create':
+            require_role('admin'); $nm = trim((string)post('name'));
+            if ($nm === '') { flash('Enter the institute name', 'err'); redirect('?p=insts'); }
+            $em = strtolower(trim((string)post('email')));
+            if ($em !== '' && (!filter_var($em, FILTER_VALIDATE_EMAIL) || strlen((string)($_POST['password'] ?? '')) < 8)) { flash('Login needs a valid email and an 8+ character password', 'err'); redirect('?p=insts'); }
+            if ($em !== '' && val('SELECT id FROM users WHERE email=?', [$em])) { flash('That email is already used by another account', 'err'); redirect('?p=insts'); }
+            q('REPLACE INTO settings(k,v) VALUES("mall_mode","1")');
+            q('INSERT INTO institutions(name,slug,type,city,phone,whatsapp,email,status) VALUES(?,?,?,?,?,?,?,"active")', [mb_substr($nm, 0, 160), unique_inst_slug($nm), isset(INST_TYPES[post('type')]) ? post('type') : 'school', mb_substr((string)post('city'), 0, 80), post('phone'), post('phone'), $em]);
+            $iid = (int)db()->lastInsertId();
+            if ($em !== '') { q('INSERT INTO users(name,email,phone,password,role,institution_id) VALUES(?,?,?,?,"institute",?)', [$nm . ' Admin', $em, post('phone'), password_hash($_POST['password'], PASSWORD_DEFAULT), $iid]); q('UPDATE institutions SET owner_id=? WHERE id=?', [(int)db()->lastInsertId(), $iid]); }
+            flash('Institute created' . ($em ? ' with login ' . $em : '') . ' — now complete its profile'); redirect("?p=inst_edit&id=$iid");
         case 'inst_status':
             require_role('admin'); $in = one('SELECT * FROM institutions WHERE id=?', [$id]); if (!$in) redirect('?p=insts');
             if (in_array(post('status'), ['active', 'pending', 'suspended'], true)) q('UPDATE institutions SET status=? WHERE id=?', [post('status'), $id]);

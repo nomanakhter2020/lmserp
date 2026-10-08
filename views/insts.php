@@ -6,6 +6,16 @@ $rows = all("SELECT i.*,(SELECT COUNT(*) FROM admissions a WHERE a.institution_i
 $cnt = array_column(all('SELECT status,COUNT(*) n FROM institutions GROUP BY status'), 'n', 'status');
 ?>
 <div class="stats"><a class="stat" href="?p=insts&f=pending"><b class="<?= !empty($cnt['pending']) ? 'neg' : '' ?>"><?= (int)($cnt['pending'] ?? 0) ?></b><span>Pending</span></a><a class="stat" href="?p=insts&f=active"><b><?= (int)($cnt['active'] ?? 0) ?></b><span>Live</span></a><a class="stat" href="?p=admissions"><b><?= (int)val('SELECT COUNT(*) FROM admissions') ?></b><span>Enquiries</span></a></div>
+<?php if (!mall()): ?><div class="alert">EduMall mode is off — the public website won't show institutes. Creating an institute turns it on.</div><?php endif ?>
+<details class="card guide" <?= $rows ? '' : 'open' ?>><summary>＋ Add institute</summary>
+<form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="inst_create">
+  <label>Institute name<input name="name" required placeholder="e.g. Bright Future School"></label>
+  <div class="two"><label>Type<select name="type"><?php foreach (INST_TYPES as $k => [$ic, $l]): ?><option value="<?= $k ?>"><?= $ic ?> <?= $l ?></option><?php endforeach ?></select></label><label>City<input name="city"></label></div>
+  <label>Phone / WhatsApp<input name="phone" inputmode="tel"></label>
+  <p class="muted" style="font-size:13px;margin:4px 0 8px">Optional — give the institute its own login to manage admissions, teachers and courses:</p>
+  <div class="two"><label>Login email<input name="email" type="email" autocomplete="off"></label><label>Password <small>(8+)</small><input name="password" type="text" minlength="8" autocomplete="new-password"></label></div>
+  <button class="btn block">Create institute</button>
+</form></details>
 <form class="search"><input type="hidden" name="p" value="insts"><input name="s" value="<?= e($s) ?>" placeholder="Search name or city"></form>
 <div class="chips"><a href="?p=insts" class="<?= !$f ? 'on' : '' ?>">All</a><a href="?p=insts&f=pending" class="<?= $f === 'pending' ? 'on' : '' ?>">Pending</a><a href="?p=insts&f=active" class="<?= $f === 'active' ? 'on' : '' ?>">Live</a><a href="?p=insts&f=suspended" class="<?= $f === 'suspended' ? 'on' : '' ?>">Suspended</a></div>
 <div class="list"><?php foreach ($rows as $i): ?>

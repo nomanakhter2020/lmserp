@@ -586,7 +586,7 @@ function menu_groups(): array {
   ['reports', '📊', 'Reports', role('admin')],
   ['settings', '⚙️', 'Settings', role('admin')],
   ['modules', '🧩', 'Modules (turn features on/off)', role('admin')],
-  ['insts', '🏫', 'Institutes' . (role('admin') && mall() && ($pi = (int)val('SELECT COUNT(*) FROM institutions WHERE status="pending"')) ? " ($pi pending)" : ''), role('admin') && mall()],
+  ['insts', '🏫', 'Institutes' . (role('admin') && mall() && ($pi = (int)val('SELECT COUNT(*) FROM institutions WHERE status="pending"')) ? " ($pi pending)" : ''), role('admin')],
   ['admissions', '📝', 'Admission enquiries', role('admin', 'institute') && mall()],
   ['inst_edit', '✏️', 'Institute profile', role('institute')],
   ['inst_teachers', '👩‍🏫', 'Our teachers', role('institute')],
