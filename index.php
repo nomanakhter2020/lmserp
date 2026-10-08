@@ -809,6 +809,12 @@ if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
 if (in_array($p, ['store', 'store_product', 'store_cart', 'store_checkout', 'track'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
+if ($p === 'install_app') { require __DIR__ . '/views/install_app.php'; exit; }
+if ($p === 'manifest') { // per-site app name/colors
+    $n = setting('institute', APP_NAME); header('Content-Type: application/manifest+json'); header('Cache-Control: no-cache');
+    echo json_encode(['name' => $n, 'short_name' => mb_substr($n, 0, 12), 'description' => (($tg = setting('site_tagline')) && $tg !== '0') ? $tg : 'Learning & institute management app', 'id' => './', 'start_url' => './?p=home', 'scope' => './', 'display' => 'standalone', 'orientation' => 'any', 'background_color' => '#f4f5fb', 'theme_color' => '#4f46e5',
+        'icons' => [['src' => 'assets/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png'], ['src' => 'assets/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png'], ['src' => 'assets/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable']]], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); exit;
+}
 if ($p === 'gen_cover') {
     $row = (int)get('c') ? one('SELECT id,title,program FROM courses WHERE id=?', [(int)get('c')]) : ((int)get('b') ? one('SELECT id,title,category FROM posts WHERE id=? AND published=1', [(int)get('b')]) : null);
     if (!$row) { http_response_code(404); exit; }

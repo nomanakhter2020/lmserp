@@ -18,6 +18,8 @@ DirectoryIndex index.php
   RewriteRule ^cart/?$ index.php?p=store_cart [QSA,L]
   RewriteRule ^checkout/?$ index.php?p=store_checkout [QSA,L]
   RewriteRule ^track/?$ index.php?p=track [QSA,L]
+  RewriteRule ^install/?$ index.php?p=install_app [QSA,L]
+  RewriteRule ^manifest\.json$ index.php?p=manifest [L]
   RewriteRule ^institutes/?$ index.php?p=institutes [QSA,L]
   RewriteRule ^i/([a-z0-9-]+)/?$ index.php?p=institute&slug=$1 [QSA,L]
   RewriteRule ^teachers/?$ index.php?p=tutors [QSA,L]
