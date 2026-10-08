@@ -24,8 +24,16 @@ function demo_get(string $url) {
     return $data;
 }
 
-function demo_fetch_photo(string $url): string {
-    $data = demo_get($url);
+// Magnific links expire; fall back to the copy already stored on the main LMS site
+const DEMO_MIRROR = 'https://lmserp.hostingersite.com/';
+function demo_get_any(string $url, string $key) {
+    $before = count($GLOBALS['demo_err']);
+    $d = demo_get($url);
+    if (!$d && rtrim(DEMO_MIRROR, '/') !== rtrim(abs_url(''), '/')) { $d = demo_get(DEMO_MIRROR . '?p=demo_img&k=' . rawurlencode($key)); if ($d) array_splice($GLOBALS['demo_err'], $before); }
+    return $d;
+}
+function demo_fetch_photo(string $url, string $key = ''): string {
+    $data = demo_get_any($url, $key);
     if (!$data || !($im = @imagecreatefromstring($data))) return '';
     $w = imagesx($im); $h = imagesy($im); $s = min($w, $h);
     $out = imagecreatetruecolor(600, 600);
@@ -218,7 +226,7 @@ function demo_seed(): array {
             $uid = (int)db()->lastInsertId();
         }
         $old = teacher_profile($uid);
-        $photo = $old['photo'] ?: demo_fetch_photo($t['photo']);
+        $photo = $old['photo'] ?: demo_fetch_photo($t['photo'], 't:' . $t['email']);
         $p = $t['p'];
         q('REPLACE INTO teacher_profiles(user_id,photo,headline,bio,city,years,skills,languages,education,experience,certifications,achievements,linkedin,website,youtube,public) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)', [
             $uid, $photo, $p['headline'], $p['bio'], $p['city'], $p['years'], $p['skills'], $p['languages'],
@@ -238,8 +246,8 @@ function demo_seed(): array {
     return $log;
 }
 
-function demo_fetch_cover(string $url): string {
-    $data = demo_get($url);
+function demo_fetch_cover(string $url, string $key = ''): string {
+    $data = demo_get_any($url, $key);
     if (!$data || !($im = @imagecreatefromstring($data))) return '';
     $w = imagesx($im); $h = imagesy($im);
     if ($w > 1280) { $nh = (int)round($h * 1280 / $w); $r = imagecreatetruecolor(1280, $nh); imagecopyresampled($r, $im, 0, 0, 0, 0, 1280, $nh, $w, $h); $im = $r; }
@@ -314,7 +322,7 @@ function demo_it_seed(): array {
         } else {
             q('UPDATE courses SET description=?,category_id=? WHERE id=?', [$desc, $cat, $id]);
         }
-        if (!val('SELECT cover FROM courses WHERE id=?', [$id]) && ($cv = demo_fetch_cover($img))) q('UPDATE courses SET cover=? WHERE id=?', [$cv, $id]);
+        if (!val('SELECT cover FROM courses WHERE id=?', [$id]) && ($cv = demo_fetch_cover($img, 'c:' . $title))) q('UPDATE courses SET cover=? WHERE id=?', [$cv, $id]);
         foreach ($lessons as $i => [$lt, $vid, $txt]) {
             if (!val('SELECT id FROM lessons WHERE course_id=? AND title=?', [$id, $lt])) q('INSERT INTO lessons(course_id,title,video_url,content,sort) VALUES(?,?,?,?,?)', [$id, $lt, $vid, $txt, 10 + $i]);
         }
@@ -350,7 +358,7 @@ function demo_covers_seed(): int {
     $n = 0;
     foreach ($map as $title => $path) {
         foreach (all('SELECT id FROM courses WHERE title=? AND (cover IS NULL OR cover="")', [$title]) as $c) {
-            if ($cv = demo_fetch_cover($B . $path)) { q('UPDATE courses SET cover=? WHERE id=?', [$cv, $c['id']]); $n++; }
+            if ($cv = demo_fetch_cover($B . $path, 'c:' . $title)) { q('UPDATE courses SET cover=? WHERE id=?', [$cv, $c['id']]); $n++; }
         }
     }
     return $n;

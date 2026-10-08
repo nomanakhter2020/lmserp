@@ -783,6 +783,14 @@ if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
 if (in_array($p, ['store', 'store_product', 'store_cart', 'store_checkout', 'track'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
+if ($p === 'demo_img') { // public: serves demo teacher photos / demo course covers so other sites can copy them
+    $k = (string)get('k'); $f = '';
+    if (str_starts_with($k, 't:') && str_ends_with($k, '@demo.lms')) $f = (string)val('SELECT tp.photo FROM teacher_profiles tp JOIN users u ON u.id=tp.user_id WHERE u.email=?', [substr($k, 2)]);
+    elseif (str_starts_with($k, 'c:')) $f = (string)val('SELECT c.cover FROM courses c JOIN users u ON u.id=c.teacher_id WHERE c.title=? AND u.email LIKE "%@demo.lms" AND c.cover<>"" LIMIT 1', [substr($k, 2)]);
+    $path = $f !== '' ? UPLOAD_DIR . '/covers/' . basename($f) : '';
+    if ($path === '' || !is_file($path)) { http_response_code(404); exit; }
+    header('Content-Type: image/jpeg'); header('Cache-Control: public, max-age=86400'); readfile($path); exit;
+}
 if (mall() && in_array($p, ['institutes', 'institute', 'inst_join', 'tutors'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if ($p === 'robots') { header('Content-Type: text/plain'); echo "User-agent: *\nAllow: /\nDisallow: /install.php\nDisallow: /*?p=login\nDisallow: /*?p=register\n\nSitemap: " . abs_url('sitemap.xml') . "\n"; exit; }
 if ($p === 'adstxt') { header('Content-Type: text/plain'); $c = adsense_client(); echo $c ? 'google.com, ' . str_replace('ca-', '', $c) . ", DIRECT, f08c47fec0942fa0\n" : "# AdSense publisher ID not set yet\n"; exit; }
