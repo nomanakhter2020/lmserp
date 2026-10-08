@@ -21,7 +21,7 @@ $cats = all('SELECT * FROM categories ORDER BY name');
 <div class="grid">
 <?php foreach ($cs as $c): ?>
   <a class="ccard" href="?p=course&id=<?= $c['id'] ?>" style="--c:<?= e($c['color']) ?>">
-    <div class="band<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"><span><?= e($c['cname'] ?: 'General') ?></span><?php if (!$c['published']): ?><span class="pill">Draft</span><?php endif ?></div>
+    <div class="band img" style="<?= cover_style($c) ?>"><span><?= e($c['cname'] ?: 'General') ?></span><?php if (!$c['published']): ?><span class="pill">Draft</span><?php endif ?></div>
     <b><?= e($c['title']) ?></b>
     <small><?= $c['program'] !== 'course' ? (PROGRAMS[$c['program']][1] ?? '') . ' ' : '' ?><?= $c['level'] ? e($c['level']) . ' · ' : '' ?><?= $c['ls'] ?> lessons · <?= e($c['tname'] ?: 'No teacher') ?></small>
     <div class="cfoot"><span class="price"><?= (float)$c['fee'] > 0 ? money($c['fee']) : 'Free' ?></span><?php if (role('admin') || (role('teacher') && (int)$c['teacher_id'] === (int)$me['id'])): ?><small><?= $c['st'] ?> students</small><?php elseif (role('teacher') && ($tf = course_fee_for($c)) < (float)$c['fee']): ?><small class="pos">You: <?= money($tf) ?></small><?php endif ?></div>

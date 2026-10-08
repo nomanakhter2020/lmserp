@@ -22,7 +22,7 @@ require __DIR__ . '/_site_head.php';
   <div class="bgrid">
   <?php foreach ($posts as $p): ?>
     <a class="bcard" href="<?= e(post_url($p)) ?>">
-      <div class="bimg" style="<?= $p['cover'] ? "background-image:url('" . e(photo_url($p['cover'])) . "')" : '' ?>"><?php if (!$p['cover']): ?><span><?= e(mb_substr($p['title'], 0, 1)) ?></span><?php endif ?></div>
+      <div class="bimg" style="background-image:url('<?= e(post_cover_url($p)) ?>')"></div>
       <div class="bbody"><span class="bcat"><?= e($p['category']) ?></span><h2><?= e($p['title']) ?></h2><p><?= e($p['excerpt']) ?></p>
         <small><?= date('M j, Y', strtotime($p['created_at'])) ?> · <?= read_mins((string)$p['content']) ?> min read</small></div>
     </a>

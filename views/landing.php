@@ -76,7 +76,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
     <div class="cgrid">
     <?php foreach ($courses as $c): ?>
       <article class="course" style="--c:<?= e($c['color']) ?>">
-        <div class="c-top<?= $c['cover'] ? ' img' : '' ?>" style="<?= cover_style($c) ?>"><span><?= e($c['cname'] ?: 'General') ?></span></div>
+        <div class="c-top img" style="<?= cover_style($c) ?>"><span><?= e($c['cname'] ?: 'General') ?></span></div>
         <div class="c-body">
           <h3><?= e($c['title']) ?></h3>
           <p><?= e(mb_strimwidth((string)$c['description'], 0, 120, '…')) ?></p>
@@ -173,7 +173,7 @@ $cta = $me ? '?p=courses' : ($canReg ? '?p=register' : '?p=login');
   <div class="container">
     <div class="sec-head"><span class="kicker">From our blog</span><h2>Free study guides &amp; tips</h2><p>Practical articles from our teachers to help you study smarter.</p></div>
     <div class="bgrid"><?php foreach ($latest as $bp): ?>
-      <a class="bcard" href="<?= e(post_url($bp)) ?>"><div class="bimg" style="<?= $bp['cover'] ? "background-image:url('" . e(photo_url($bp['cover'])) . "')" : '' ?>"><?php if (!$bp['cover']): ?><span><?= e(mb_substr($bp['title'], 0, 1)) ?></span><?php endif ?></div>
+      <a class="bcard" href="<?= e(post_url($bp)) ?>"><div class="bimg" style="background-image:url('<?= e(post_cover_url($bp)) ?>')"></div>
         <div class="bbody"><span class="bcat"><?= e($bp['category']) ?></span><h2><?= e($bp['title']) ?></h2><p><?= e($bp['excerpt']) ?></p><small><?= read_mins((string)$bp['content']) ?> min read</small></div></a>
     <?php endforeach ?></div>
     <div class="center" style="margin-top:30px"><a class="btn-o lg" href="blog">Read all articles →</a></div>

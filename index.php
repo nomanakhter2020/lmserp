@@ -801,6 +801,12 @@ if ($p === 'teacher') { require __DIR__ . '/views/teacher.php'; exit; }
 if ($p === 'cert' || $p === 'verify') { require __DIR__ . '/views/cert.php'; exit; }
 if (in_array($p, ['store', 'store_product', 'store_cart', 'store_checkout', 'track'], true)) { require __DIR__ . "/views/$p.php"; exit; }
 if (in_array($p, ['blog', 'post', 'page'], true)) { require __DIR__ . "/views/$p.php"; exit; }
+if ($p === 'gen_cover') {
+    $row = (int)get('c') ? one('SELECT id,title,program FROM courses WHERE id=?', [(int)get('c')]) : ((int)get('b') ? one('SELECT id,title,category FROM posts WHERE id=? AND published=1', [(int)get('b')]) : null);
+    if (!$row) { http_response_code(404); exit; }
+    $f = gen_cover($row['title'], isset($row['program']) ? (PROGRAMS[$row['program']][0] ?? 'Course') : ($row['category'] ?: 'Blog'), (int)$row['id']);
+    header('Content-Type: image/jpeg'); header('Cache-Control: public, max-age=604800'); readfile($f); exit;
+}
 if ($p === 'demo_img') { // public: serves demo teacher photos / demo course covers so other sites can copy them
     $k = (string)get('k'); $f = '';
     if (str_starts_with($k, 't:') && str_ends_with($k, '@demo.lms')) $f = (string)val('SELECT tp.photo FROM teacher_profiles tp JOIN users u ON u.id=tp.user_id WHERE u.email=?', [substr($k, 2)]);

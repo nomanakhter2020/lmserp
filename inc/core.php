@@ -19,7 +19,7 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.3.0';
 const DB_VERSION = 19;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
@@ -225,7 +225,32 @@ function save_cover(string $field): string {
     if (!move_uploaded_file($f['tmp_name'], UPLOAD_DIR . "/covers/$name.$ext")) throw new RuntimeException('Could not save image.');
     return "$name.$ext";
 }
-function cover_url(array $c): string { return !empty($c['cover']) ? '?p=cover&f=' . rawurlencode($c['cover']) : ''; }
+function cover_url(array $c): string { return !empty($c['cover']) ? '?p=cover&f=' . rawurlencode($c['cover']) : (!empty($c['id']) ? '?p=gen_cover&c=' . (int)$c['id'] : ''); }
+function post_cover_url(array $p): string { return !empty($p['cover']) ? photo_url($p['cover']) : '?p=gen_cover&b=' . (int)$p['id']; }
+// Designed cover image (gradient + title) for courses/posts without a photo. Cached outside public_html.
+function gen_cover(string $title, string $label, int $seed): string {
+    $dir = UPLOAD_DIR . '/gen'; if (!is_dir($dir)) mkdir($dir, 0750, true);
+    $file = $dir . '/' . md5("v2|$title|$label|$seed") . '.jpg'; if (is_file($file)) return $file;
+    $W = 1200; $H = 630; $im = imagecreatetruecolor($W, $H);
+    $pal = [[79, 70, 229, 124, 58, 237], [14, 165, 233, 79, 70, 229], [16, 185, 129, 14, 116, 144], [234, 88, 12, 219, 39, 119], [147, 51, 234, 219, 39, 119], [30, 27, 75, 67, 56, 202], [5, 150, 105, 22, 163, 74], [217, 119, 6, 234, 88, 12]];
+    [$r1, $g1, $b1, $r2, $g2, $b2] = $pal[$seed % count($pal)];
+    for ($y = 0; $y < $H; $y++) { $t = $y / $H; imageline($im, 0, $y, $W, $y, imagecolorallocate($im, (int)($r1 + ($r2 - $r1) * $t), (int)($g1 + ($g2 - $g1) * $t), (int)($b1 + ($b2 - $b1) * $t))); }
+    imagealphablending($im, true);
+    $wc = imagecolorallocatealpha($im, 255, 255, 255, 112);
+    imagefilledellipse($im, $W - 120, 90, 520, 520, $wc); imagefilledellipse($im, 140, $H + 40, 420, 420, $wc); imagefilledellipse($im, $W - 340, $H - 40, 180, 180, $wc);
+    $white = imagecolorallocate($im, 255, 255, 255); $soft = imagecolorallocatealpha($im, 255, 255, 255, 40);
+    $fb = dirname(__DIR__) . '/assets/fonts/DejaVuSans-Bold.ttf'; $fr = dirname(__DIR__) . '/assets/fonts/DejaVuSans.ttf';
+    if (function_exists('imagettftext') && is_file($fb)) {
+        $size = mb_strlen($title) > 60 ? 44 : (mb_strlen($title) > 34 ? 54 : 64); $lines = []; $line = '';
+        foreach (preg_split('/\s+/', trim($title)) as $w) { $try = trim("$line $w"); $bb = imagettfbbox($size, 0, $fb, $try); if ($bb[2] - $bb[0] > $W - 160 && $line !== '') { $lines[] = $line; $line = $w; } else $line = $try; }
+        $lines[] = $line; $lines = array_slice($lines, 0, 4); $lh = (int)($size * 1.3);
+        $y0 = (int)(($H - count($lines) * $lh) / 2) + $size + 10;
+        imagettftext($im, 22, 0, 80, $y0 - $size - 40, $soft, $fr, mb_strtoupper($label));
+        foreach ($lines as $i => $l) imagettftext($im, $size, 0, 80, $y0 + $i * $lh, $white, $fb, $l);
+        imagettftext($im, 20, 0, 80, $H - 50, $soft, $fb, setting('institute', APP_NAME));
+    } else imagestring($im, 5, 60, (int)($H / 2), $title, $white);
+    imagejpeg($im, $file, 86); imagedestroy($im); return $file;
+}
 function cover_style(array $c): string { $u = cover_url($c); return $u ? "background-image:url('" . e($u) . "')" : ''; }
 
 function teacher_profile(int $uid): array {
