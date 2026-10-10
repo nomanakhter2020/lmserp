@@ -9,15 +9,15 @@ $rpId = preg_replace('/:\d+$/', '', $host);
 $origin = (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off' ? (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' ? 'https' : 'http') : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? $rpId);
 $step = (string)post('step');
 function check_client(string $cdj, string $type, string $origin): void {
+    $expected = (string)($_SESSION['wa_chal'] ?? ''); unset($_SESSION['wa_chal']); // single use
     $c = json_decode($cdj, true);
     if (!$c || ($c['type'] ?? '') !== $type) wa_out(['error' => 'Bad request'], 400);
-    if (!hash_equals((string)($_SESSION['wa_chal'] ?? ''), (string)($c['challenge'] ?? ''))) wa_out(['error' => 'Session expired, try again'], 400);
+    if ($expected === '' || !hash_equals($expected, (string)($c['challenge'] ?? ''))) wa_out(['error' => 'Session expired, try again'], 400);
     if (($c['origin'] ?? '') !== $origin) wa_out(['error' => 'Origin mismatch'], 400);
-    unset($_SESSION['wa_chal']);
 }
 function check_auth(string $ad, string $rpId): array {
     if (strlen($ad) < 37 || !hash_equals(hash('sha256', $rpId, true), substr($ad, 0, 32))) wa_out(['error' => 'Wrong site'], 400);
-    $flags = ord($ad[32]); if (!($flags & 1)) wa_out(['error' => 'User not present'], 400);
+    $flags = ord($ad[32]); if (!($flags & 1)) wa_out(['error' => 'User not present'], 400); if (!($flags & 4)) wa_out(['error' => 'Fingerprint / Face ID verification required'], 400);
     return [$flags, unpack('N', substr($ad, 33, 4))[1]];
 }
 $chal = b64u(random_bytes(32));

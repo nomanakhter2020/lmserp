@@ -15,7 +15,7 @@ $monthly = 0; foreach ($rows as $r) if ($r['active']) $monthly += $r['frequency'
   <input name="title" value="<?= e($f['title']) ?>" placeholder="e.g. Office rent, Teacher salary, Internet" required>
   <div class="two"><input name="amount" type="number" min="1" value="<?= e($f['amount']) ?>" placeholder="Amount (PKR)" required>
     <select name="frequency"><?php foreach ($fl as $k => $v): ?><option value="<?= $k ?>" <?= $f['frequency'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach ?></select></div>
-  <select name="category_id"><option value="">Select category</option><?php foreach ($cats as $c): ?><option value="<?= $c['id'] ?>" <?= $f['category_id'] == $c['id'] ? 'selected' : '' ?>><?= $c['icon'] ?> <?= e($c['name']) ?></option><?php endforeach ?></select>
+  <select name="category_id"><option value="">Select category</option><?php foreach ($cats as $c): ?><option value="<?= $c['id'] ?>" <?= $f['category_id'] == $c['id'] ? 'selected' : '' ?>><?= e($c['icon']) ?> <?= e($c['name']) ?></option><?php endforeach ?></select>
   <label><?= $edit ? 'Next due date' : 'First due date' ?><input name="next_date" type="date" value="<?= e($f['next_date']) ?>" required></label>
   <input name="note" value="<?= e($f['note']) ?>" placeholder="Note (optional)">
   <label class="check"><input type="checkbox" name="active" value="1" <?= $f['active'] ? 'checked' : '' ?>> Active</label>
@@ -23,7 +23,7 @@ $monthly = 0; foreach ($rows as $r) if ($r['active']) $monthly += $r['frequency'
 </form>
 
 <div class="list"><?php foreach ($rows as $r): ?>
-  <div class="row <?= $r['active'] ? '' : 'locked' ?>"><span class="mi"><?= $r['icon'] ?: '🔁' ?></span>
+  <div class="row <?= $r['active'] ? '' : 'locked' ?>"><span class="mi"><?= e($r['icon'] ?: '🔁') ?></span>
     <div class="grow"><b><?= e($r['title']) ?></b><small><?= $fl[$r['frequency']] ?> · <?= e($r['cname'] ?: 'Uncategorised') ?> · <?= $r['active'] ? 'next ' . date('d M Y', strtotime($r['next_date'])) : 'paused' ?></small></div>
     <b class="neg"><?= money($r['amount']) ?></b>
     <a class="x" href="?p=recurring&id=<?= $r['id'] ?>#form" aria-label="Edit">✏️</a>

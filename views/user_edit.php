@@ -1,6 +1,7 @@
 <?php
 require_role('admin');
 $u = $id ? one('SELECT * FROM users WHERE id=?', [$id]) : ['name' => '', 'email' => '', 'phone' => '', 'role' => get('role', 'student'), 'active' => 1, 'staff_role' => 'admin'];
+if ($u && $id && ($u['staff_role'] ?? '') === 'super' && !is_super()) $u = null;
 if (!$u) exit('Not found');
 $title = $id ? 'Edit person' : 'Add person'; $back = $id ? "?p=user&id=$id" : '?p=users';
 ?>

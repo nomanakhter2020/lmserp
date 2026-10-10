@@ -1,6 +1,6 @@
 <?php
 // Public CV-style teacher profile
-$t = one('SELECT id,name,email,phone,role FROM users WHERE id=? AND active=1 AND role IN ("teacher","admin")', [$id]);
+$t = one('SELECT u.id,u.name,u.email,u.phone,u.role FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id AND tp.public=1 WHERE u.id=? AND u.active=1 AND (u.role="teacher" OR (u.role="admin" AND u.staff_role<>"super"))', [$id]);
 $pr = $t ? teacher_profile((int)$t['id']) : null;
 $me = user();
 $own = $me && ($me['role'] === 'admin' || (int)$me['id'] === (int)($t['id'] ?? 0));

@@ -1,6 +1,6 @@
 <?php
 require_role('admin', 'teacher');
-$me = user(); $r = (string)get('role', 'student'); $s = trim((string)get('s'));
+$me = user(); $r = (string)get('role', 'student'); if (staff_role() === 'hr') $r = 'teacher'; $s = trim((string)get('s'));
 $title = role('admin') ? 'People' : 'My students';
 if (role('teacher')) {
     $us = all('SELECT DISTINCT u.* FROM users u JOIN enrollments e ON e.user_id=u.id JOIN courses c ON c.id=e.course_id WHERE c.teacher_id=? AND u.name LIKE ? ORDER BY u.name', [$me['id'], "%$s%"]);
@@ -10,7 +10,7 @@ if (role('teacher')) {
 ?>
 <form class="search"><input type="hidden" name="p" value="users"><input type="hidden" name="role" value="<?= e($r) ?>"><input name="s" value="<?= e($s) ?>" placeholder="Search name, email, phone…" type="search"></form>
 <?php if (role('admin')): ?>
-<div class="chips"><?php foreach (['student' => 'Students', 'teacher' => 'Teachers', 'parent' => 'Parents', 'admin' => 'Staff'] as $k => $v): ?><a href="?p=users&role=<?= $k ?>" class="<?= $r === $k ? 'on' : '' ?>"><?= $v ?></a><?php endforeach ?><a href="?p=enrollments">Enrollments</a></div>
+<div class="chips"><?php foreach (staff_role() === 'hr' ? ['teacher' => 'Teachers'] : (staff_role() === 'accountant' ? ['student' => 'Students', 'parent' => 'Parents'] : ['student' => 'Students', 'teacher' => 'Teachers', 'parent' => 'Parents', 'admin' => 'Staff']) as $k => $v): ?><a href="?p=users&role=<?= $k ?>" class="<?= $r === $k ? 'on' : '' ?>"><?= $v ?></a><?php endforeach ?><a href="?p=enrollments">Enrollments</a></div>
 <a class="btn block" href="?p=user_edit&role=<?= e($r) ?>">＋ Add <?= e($r) ?></a>
 <?php endif ?>
 <div class="list"><?php foreach ($us as $u): ?>

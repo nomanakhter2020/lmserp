@@ -2,6 +2,7 @@
 $inst = setting('institute', APP_NAME);
 $o = (int)get('o') ? one('SELECT * FROM orders WHERE id=?', [(int)get('o')]) : null;
 if (!$o && get('no') !== '' && get('phone') !== '') { // lookup by order number + phone
+    if (rate_limited('track', 10, 15)) { $notFound = true; $no = 0; } else
     $no = (int)preg_replace('/\D/', '', (string)get('no')); $cand = $no ? one('SELECT * FROM orders WHERE id=?', [$no]) : null;
     $ph = substr(preg_replace('/\D/', '', (string)get('phone')), -10);
     if ($cand && $ph !== '' && substr(preg_replace('/\D/', '', $cand['phone']), -10) === $ph) { $_SESSION['my_orders'][$cand['id']] = $cand['token']; header('Location: ' . order_track_url($cand)); exit; }

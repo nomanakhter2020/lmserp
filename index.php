@@ -29,9 +29,10 @@ if ($isPost) {
             if (!$uid || time() - (int)($_SESSION['2fa_at'] ?? 0) > 300) { unset($_SESSION['2fa_uid']); flash('Session expired, log in again', 'err'); redirect('?p=login'); }
             $u = one('SELECT * FROM users WHERE id=? AND active=1', [$uid]);
             if ($u && login_blocked($u['email'])) { flash('Too many attempts. Wait 15 minutes.', 'err'); redirect('?p=login'); }
-            if ($u && totp_verify($u['totp_secret'], (string)post('code'))) { login_ok($u, '2fa'); redirect('./'); }
+            if ($u && totp_verify($u['totp_secret'], (string)post('code'), (int)$u['id'])) { login_ok($u, '2fa'); redirect('./'); }
             if ($u) login_failed($u['email']); flash('Wrong code, try again', 'err'); redirect('?p=twofa');
         case 'register':
+            if (rate_limited('register', 5, 60)) { flash('Too many sign-ups from this network. Please try again later.', 'err'); redirect('?p=register'); }
             if (setting('allow_register', '1') !== '1') redirect('?p=login');
             if (!filter_var(post('email'), FILTER_VALIDATE_EMAIL) || strlen((string)$_POST['password']) < 6) { flash('Valid email and 6+ char password required', 'err'); redirect('?p=register'); }
             if (val('SELECT id FROM users WHERE email=?', [post('email')])) { flash('Email already registered', 'err'); redirect('?p=register'); }
@@ -82,6 +83,7 @@ if ($isPost) {
     }
     if ($a === 'inst_register') { // "List your institute"
         if (!mall()) redirect('./');
+        if (rate_limited('inst_register', 3, 60)) { flash('Too many listings from this network. Please try again later.', 'err'); redirect('?p=inst_join'); }
         $email = strtolower(trim((string)post('email')));
         if (post('website') !== '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen((string)($_POST['password'] ?? '')) < 8 || trim((string)post('inst_name')) === '' || trim((string)post('phone')) === '') { flash('Please fill all fields (password 8+ characters).', 'err'); redirect('?p=inst_join'); }
         if (val('SELECT id FROM users WHERE email=?', [$email])) { flash('This email is already registered — log in instead.', 'err'); redirect('?p=inst_join'); }
@@ -95,6 +97,7 @@ if ($isPost) {
         flash('Welcome! Complete your profile — your listing goes live after approval.'); redirect('?p=inst_edit');
     }
     if ($a === 'contact_send') {
+        if (rate_limited('contact', 5, 60)) { flash('Too many messages. Please try again later.', 'err'); redirect('contact'); }
         if (post('website') !== '' || (time() - ($_SESSION['last_contact'] ?? 0)) < 30) { flash('Please wait a moment before sending another message.', 'err'); redirect('contact'); }
         if (post('name') === '' || post('message') === '' || (post('email') === '' && post('phone') === '')) { flash('Please enter your name, message and an email or phone.', 'err'); redirect('contact'); }
         q('INSERT INTO contact_messages(name,email,phone,subject,message) VALUES(?,?,?,?,?)', [mb_substr(post('name'), 0, 120), mb_substr(post('email'), 0, 160), mb_substr(post('phone'), 0, 40), mb_substr(post('subject'), 0, 200), mb_substr(post('message'), 0, 3000)]);
@@ -109,7 +112,7 @@ if ($isPost) {
         case 'course_save':
             require_role('admin', 'teacher', 'institute');
             if ($id) { $c = one('SELECT * FROM courses WHERE id=?', [$id]); if (!$c || !can_manage_course($c)) exit('Not allowed'); }
-            if (role('institute')) { $tp = (int)post('teacher_id'); $teacher = $tp && val('SELECT 1 FROM teacher_institutions WHERE teacher_id=? AND institution_id=? AND status="active"', [$tp, my_inst_id()]) ? $tp : null; $instId = my_inst_id(); }
+            if (role('institute')) { if ((my_inst()['status'] ?? '') !== 'active') $_POST['published'] = ''; $tp = (int)post('teacher_id'); $teacher = $tp && val('SELECT 1 FROM teacher_institutions WHERE teacher_id=? AND institution_id=? AND status="active"', [$tp, my_inst_id()]) ? $tp : null; $instId = my_inst_id(); }
             elseif (role('admin')) { $teacher = (int)post('teacher_id') ?: null; $instId = (int)post('institution_id') ?: null; }
             else { $teacher = $me['id']; $ip = (int)post('institution_id'); $instId = $ip && val('SELECT 1 FROM teacher_institutions WHERE teacher_id=? AND institution_id=? AND status="active"', [$me['id'], $ip]) ? $ip : null; }
             $data = [post('title'), post('description'), (int)post('category_id') ?: null, $teacher, (float)post('fee'), post('color', '#4f46e5'), post('published') ? 1 : 0];
@@ -204,7 +207,8 @@ if ($isPost) {
             $role = in_array(post('role'), ['admin', 'teacher', 'student', 'parent'], true) ? post('role') : 'student';
             $target = $id ? one('SELECT * FROM users WHERE id=?', [$id]) : null;
             if (!is_super() && ($role === 'admin' || ($target && $target['role'] === 'admin'))) { flash('Only the Super Admin can create or change staff accounts.', 'err'); redirect($id ? "?p=user&id=$id" : '?p=users'); }
-            if (staff_role() === 'hr' && !in_array($role, ['teacher'], true) && !($target && $target['role'] === $role && $role === 'teacher')) { flash('HR can manage teacher accounts only.', 'err'); redirect('?p=users&role=teacher'); }
+            if ($target && $target['role'] === 'institute' && !is_super()) { flash('Institute logins are managed by the Super Admin.', 'err'); redirect("?p=user&id=$id"); }
+            if (staff_role() === 'hr' && !($role === 'teacher' && (!$target || $target['role'] === 'teacher'))) { flash('HR can manage teacher accounts only.', 'err'); redirect('?p=users&role=teacher'); }
             $sr = $role === 'admin' ? (isset(STAFF_ROLES[post('staff_role')]) ? post('staff_role') : 'admin') : '';
             if ($target && (int)$target['id'] === (int)$me['id'] && $sr !== 'super' && $target['staff_role'] === 'super' && !val('SELECT COUNT(*) FROM users WHERE role="admin" AND staff_role="super" AND active=1 AND id<>?', [$id])) { flash('You are the only Super Admin — you cannot remove your own Super Admin role.', 'err'); redirect("?p=user&id=$id"); }
             if ($id) {
@@ -283,7 +287,7 @@ if ($isPost) {
         case 'recurring_delete':
             require_role('admin'); q('DELETE FROM recurring_expenses WHERE id=?', [$id]); flash('Recurring expense removed (past entries kept)'); redirect('?p=recurring');
         case 'expcat_add':
-            require_role('admin'); q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [post('name'), post('icon') ?: '💸']); redirect('?p=expense_cats');
+            require_role('admin'); q('INSERT INTO expense_categories(name,icon) VALUES(?,?)', [mb_substr((string)post('name'), 0, 60), mb_substr(strip_tags((string)post('icon')), 0, 4) ?: '💸']); redirect('?p=expense_cats');
         case 'expcat_delete':
             require_role('admin'); q('UPDATE expenses SET category_id=NULL WHERE category_id=?', [$id]); q('UPDATE recurring_expenses SET category_id=NULL WHERE category_id=?', [$id]); q('DELETE FROM expense_categories WHERE id=?', [$id]); redirect('?p=expense_cats');
         case 'expense_delete':
@@ -691,7 +695,7 @@ if ($isPost) {
         case 'inst_teacher_invite':
             require_role('institute'); $iid = my_inst_id();
             $t = one('SELECT * FROM users WHERE email=? AND role="teacher" AND active=1', [strtolower(trim((string)post('email')))]);
-            if (!$t) { flash('No teacher account with that email. Ask the teacher to sign up as a teacher first.', 'err'); redirect('?p=inst_teachers'); }
+            if (!$t) { flash('If a teacher account exists with that email, an invitation has been sent. New teachers can sign up as a teacher first.'); redirect('?p=inst_teachers'); }
             $cur = val('SELECT status FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]);
             if ($cur === 'pending' && val('SELECT requested_by FROM teacher_institutions WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]) === 'teacher') q('UPDATE teacher_institutions SET status="active" WHERE teacher_id=? AND institution_id=?', [$t['id'], $iid]);
             elseif (!$cur || $cur === 'rejected') q('REPLACE INTO teacher_institutions(teacher_id,institution_id,status,requested_by) VALUES(?,?,"pending","institute")', [$t['id'], $iid]);
@@ -717,7 +721,7 @@ if ($isPost) {
         case 'mall_clear':
             require_role('admin'); require __DIR__ . '/inc/mall_seed.php'; flash('Removed ' . mall_demo_clear() . ' demo institutes'); redirect('?p=modules');
         case 'mall_settings':
-            require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("mall_mode",?)', [post('mall_mode') ? '1' : '0']); flash('Saved'); redirect('?p=modules');
+            require_role('admin'); q('REPLACE INTO settings(k,v) VALUES("mall_mode",?)', [post('mall_mode') === '1' ? '1' : '0']); flash('Edition: ' . (post('mall_mode') === '1' ? 'Multi-Vendor Academy' : 'Single Academy')); redirect('?p=modules');
         case 'twofa_enable':
             $sec = (string)($_SESSION['totp_new'] ?? '');
             if ($sec !== '' && totp_verify($sec, (string)post('code'))) { q('UPDATE users SET totp_secret=? WHERE id=?', [$sec, $me['id']]); unset($_SESSION['totp_new']); $_SESSION['via'] = '2fa'; flash('Two-step verification is ON'); }
@@ -738,7 +742,8 @@ if ($isPost) {
             foreach (['institute', 'phone', 'allow_register', 'paid_needs_approval', 'pay_bank', 'pay_jazzcash', 'pay_easypaisa', 'pay_cash', 'site_tagline', 'site_about', 'site_whatsapp', 'site_email', 'site_address', 'adsense_client', 'teacher_discount', 'cert_auto', 'cert_signer', 'cert_signer_title', 'shop_shipping', 'shop_free_over', 'shop_cod', 'teacher_share'] as $k) q('REPLACE INTO settings(k,v) VALUES(?,?)', [$k, post($k, '0')]);
             flash('Settings saved'); redirect('?p=settings');
         case 'tprofile_save':
-            $uid = role('admin') && (int)post('user_id') ? (int)post('user_id') : (int)$me['id'];
+            $uid = (int)$me['id'];
+            if (role('admin') && (int)post('user_id') && (int)post('user_id') !== $uid) { $tu = one('SELECT role,staff_role FROM users WHERE id=?', [(int)post('user_id')]); if (!$tu || !in_array(staff_role(), ['super', 'admin'], true) || !($tu['role'] === 'teacher' || ($tu['role'] === 'admin' && ($tu['staff_role'] !== 'super' || is_super())))) exit('Not allowed'); $uid = (int)post('user_id'); }
             if (!role('admin') && !role('teacher')) exit('Not allowed');
             $rows = function (string $k, array $fields) {
                 $out = [];
@@ -779,6 +784,7 @@ if ($p === 'cover') { // public: course covers are shown on the website
     readfile($path); exit;
 }
 if ($p === 'sub_file') {
+    if (in_array(staff_role(), ['hr', 'accountant'], true)) exit('Not allowed');
     require_login();
     $sb = one('SELECT s.*,a.course_id,c.teacher_id FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN courses c ON c.id=a.course_id WHERE s.id=?', [$id]);
     if (!$sb || !$sb['file'] || !((int)$sb['user_id'] === (int)user()['id'] || can_manage_course($sb) || is_parent_of((int)$sb['user_id']))) { http_response_code(404); exit; }
@@ -786,7 +792,7 @@ if ($p === 'sub_file') {
     header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: inline'); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
 }
 if ($p === 'dl' || $p === 'order_proof_file') {
-    if ($p === 'order_proof_file') require_login();
+    if ($p === 'order_proof_file') { require_login(); if (staff_role() === 'hr') exit('Not allowed'); }
     if ($p === 'dl') {
         $it = one('SELECT oi.*,o.user_id,o.student_id,o.status,o.token,pr.file FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products pr ON pr.id=oi.product_id WHERE oi.id=?', [$id]);
         $ok = $it && $it['file'] && in_array($it['status'], ['paid', 'processing', 'shipped', 'delivered'], true) && can_view_order(one('SELECT * FROM orders WHERE id=?', [$it['order_id']]));
@@ -796,6 +802,7 @@ if ($p === 'dl' || $p === 'order_proof_file') {
     header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path)); header('Content-Disposition: ' . ($p === 'dl' ? 'attachment; filename="' . preg_replace('/[^\w.-]+/', '-', $it['title'] ?? 'file') . '.' . pathinfo($path, PATHINFO_EXTENSION) . '"' : 'inline')); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
 }
 if ($p === 'proof_file') {
+    if (staff_role() === 'hr') exit('Not allowed');
     require_login();
     $r = one('SELECT * FROM payment_requests WHERE id=?', [$id]);
     if (!$r || !$r['proof'] || (!role('admin') && (int)$r['user_id'] !== (int)user()['id'])) { http_response_code(404); exit; }
@@ -816,7 +823,7 @@ if ($p === 'manifest') { // per-site app name/colors
         'icons' => [['src' => 'assets/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png'], ['src' => 'assets/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png'], ['src' => 'assets/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable']]], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); exit;
 }
 if ($p === 'gen_cover') {
-    $row = (int)get('c') ? one('SELECT id,title,program FROM courses WHERE id=?', [(int)get('c')]) : ((int)get('b') ? one('SELECT id,title,category FROM posts WHERE id=? AND published=1', [(int)get('b')]) : null);
+    $row = (int)get('c') ? one('SELECT id,title,program FROM courses WHERE id=? AND published=1', [(int)get('c')]) : ((int)get('b') ? one('SELECT id,title,category FROM posts WHERE id=? AND published=1', [(int)get('b')]) : null);
     if (!$row) { http_response_code(404); exit; }
     $f = gen_cover($row['title'], isset($row['program']) ? (PROGRAMS[$row['program']][0] ?? 'Course') : ($row['category'] ?: 'Blog'), (int)$row['id']);
     header('Content-Type: image/jpeg'); header('Cache-Control: public, max-age=604800'); readfile($f); exit;
@@ -852,7 +859,7 @@ if ($p === 'imp_stop' && !empty($_SESSION['imp_from']) && hash_equals(csrf(), (s
 if ($p === 'logout') { if (!empty($_SESSION['imp_from']) && hash_equals(csrf(), (string)get('t'))) { $orig = (int)$_SESSION['imp_from']; session_regenerate_id(true); $_SESSION = ['uid' => $orig, 'seen' => time()]; redirect('?p=users'); } if (hash_equals(csrf(), (string)get('t'))) { $_SESSION = []; session_destroy(); } redirect('?p=login'); }
 if ($p === 'twofa' && (empty($_SESSION['2fa_uid']) || user())) redirect('?p=login');
 if ($p === 'backup_dl') {
-    require_role('admin'); $f = basename((string)get('f'));
+    require_role('admin'); if (!is_super()) { http_response_code(403); exit('Not allowed'); } $f = basename((string)get('f'));
     if (!preg_match('/^backup-[\d-]+\.sql\.gz$/', $f) || !is_file(BACKUP_DIR . "/$f")) exit('Not found');
     header('Content-Type: application/gzip'); header('Content-Disposition: attachment; filename="' . $f . '"'); header('Content-Length: ' . filesize(BACKUP_DIR . "/$f")); readfile(BACKUP_DIR . "/$f"); exit;
 }

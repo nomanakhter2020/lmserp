@@ -19,8 +19,8 @@ $_SESSION['seen'] = time();
 date_default_timezone_set('Asia/Karachi');
 
 const APP_NAME = 'LMS ERP';
-const APP_VERSION = '3.5.0';
-const DB_VERSION = 19;
+const APP_VERSION = '3.6.0';
+const DB_VERSION = 20;
 define('CONFIG_FILE', dirname(__DIR__, 2) . '/lmserp-config.php'); // outside public_html
 define('UPLOAD_DIR', dirname(__DIR__, 2) . '/lmserp-uploads'); // outside public_html, survives git deploys
 
@@ -96,16 +96,16 @@ function can_manage_course(array $c): bool {
 
 /* ---------------- Staff roles inside admin: super / admin / accountant / hr ---------------- */
 const STAFF_ROLES = ['super' => ['👑', 'Super Admin', 'Everything, including settings, modules, backups and staff'], 'admin' => ['🛠️', 'Admin', 'Day-to-day: courses, people, classes, exams, admissions, shop, website, fees'], 'accountant' => ['💰', 'Accountant', 'Fees, vouchers, payments, expenses, reports, payroll payouts'], 'hr' => ['👥', 'HR Manager', 'Teachers & staff, attendance reports, payroll']];
-const STAFF_COMMON_VIEWS = ['home', 'more', 'notifications', 'profile', 'help', 'biometric', 'security', 'receipt'];
+const STAFF_COMMON_VIEWS = ['home', 'more', 'notifications', 'profile', 'help', 'biometric', 'security'];
 const STAFF_VIEWS = [
-    'accountant' => ['fees', 'vouchers', 'voucher', 'voucher_gen', 'proofs', 'expenses', 'recurring', 'expense_cats', 'reports', 'payroll', 'slip', 'earnings', 'orders', 'order', 'users', 'user', 'enrollments'],
+    'accountant' => ['receipt', 'fees', 'vouchers', 'voucher', 'voucher_gen', 'proofs', 'expenses', 'recurring', 'expense_cats', 'reports', 'payroll', 'slip', 'earnings', 'orders', 'order', 'users', 'user', 'enrollments'],
     'hr' => ['users', 'user', 'user_edit', 'teachers', 'teacher', 'payroll', 'slip', 'batches', 'batch', 'att_report', 'insts', 'inst_edit'],
 ];
 const STAFF_ACTIONS = [
     'accountant' => ['payment_add', 'proof_review', 'payment_delete', 'expense_add', 'expense_delete', 'recurring_save', 'recurring_delete', 'expcat_add', 'expcat_delete', 'plan_save', 'plan_delete', 'voucher_generate', 'installments_create', 'voucher_pay', 'voucher_cancel', 'voucher_edit', 'enroll_discount', 'slip_pay', 'payout_save', 'payout_delete', 'order_status', 'order_bulk'],
-    'hr' => ['user_save', 'salary_rule', 'slips_generate', 'slip_update', 'slip_delete', 'parent_add', 'parent_unlink'],
+    'hr' => ['user_save', 'salary_rule', 'slips_generate', 'slip_update', 'slip_delete'],
 ];
-const STAFF_COMMON_ACTIONS = ['notif_read_all', 'notif_clear', 'profile_save', 'twofa_enable', 'twofa_disable', 'checklist_hide', 'tprofile_save'];
+const STAFF_COMMON_ACTIONS = ['notif_read_all', 'notif_clear', 'profile_save', 'twofa_enable', 'twofa_disable', 'checklist_hide'];
 const SUPER_ONLY_VIEWS = ['settings', 'modules'];
 const SUPER_ONLY_ACTIONS = ['settings_save', 'modules_save', 'mall_settings', 'mall_seed', 'mall_clear', 'backup_now', 'demo_seed', 'shop_seed', 'shop_clear', 'blog_seed', 'guide_seed'];
 function staff_role(): string {
@@ -176,6 +176,8 @@ function migrate() {
         db()->exec("ALTER TABLE users ADD staff_role VARCHAR(12) NOT NULL DEFAULT ''");
         db()->exec("UPDATE users SET staff_role='super' WHERE role='admin'"); // existing admins keep full access
     }
+    if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='totp_last'"))
+        db()->exec("ALTER TABLE users ADD totp_last INT NOT NULL DEFAULT 0");
     if (!val("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='totp_secret'"))
         db()->exec("ALTER TABLE users ADD totp_secret VARCHAR(64) DEFAULT ''");
     foreach ([['products', 'teacher_id', 'INT NULL'], ['products', 'review', "VARCHAR(10) DEFAULT ''"], ['order_items', 'teacher_id', 'INT NULL'], ['order_items', 'teacher_share', 'DECIMAL(10,2) DEFAULT 0']] as [$t, $col, $def])
@@ -255,7 +257,7 @@ function cover_style(array $c): string { $u = cover_url($c); return $u ? "backgr
 
 function teacher_profile(int $uid): array {
     $p = one('SELECT * FROM teacher_profiles WHERE user_id=?', [$uid]) ?: [];
-    $p += ['photo' => '', 'headline' => '', 'bio' => '', 'city' => '', 'years' => 0, 'skills' => '', 'languages' => '', 'achievements' => '', 'linkedin' => '', 'website' => '', 'youtube' => '', 'public' => 1];
+    $p += ['photo' => '', 'headline' => '', 'bio' => '', 'city' => '', 'years' => 0, 'skills' => '', 'languages' => '', 'achievements' => '', 'linkedin' => '', 'website' => '', 'youtube' => '', 'public' => 0];
     foreach (['education', 'experience', 'certifications'] as $k) $p[$k] = json_decode((string)($p[$k] ?? ''), true) ?: [];
     return $p;
 }
@@ -586,7 +588,13 @@ function client_ip(): string { return substr((string)($_SERVER['REMOTE_ADDR'] ??
 function login_blocked(string $email): bool {
     q('DELETE FROM login_attempts WHERE at < NOW() - INTERVAL 1 DAY');
     return (int)val('SELECT COUNT(*) FROM login_attempts WHERE email=? AND at > NOW() - INTERVAL 15 MINUTE', [strtolower($email)]) >= 5
-        || (int)val('SELECT COUNT(*) FROM login_attempts WHERE ip=? AND at > NOW() - INTERVAL 15 MINUTE', [client_ip()]) >= 20;
+        || (int)val('SELECT COUNT(*) FROM login_attempts WHERE ip=? AND email NOT LIKE "rl:%" AND at > NOW() - INTERVAL 15 MINUTE', [client_ip()]) >= 20;
+}
+// Generic per-IP throttle for public forms: true = over the limit (also records this hit)
+function rate_limited(string $key, int $max, int $minutes): bool {
+    $k = 'rl:' . $key;
+    if ((int)val('SELECT COUNT(*) FROM login_attempts WHERE email=? AND ip=? AND at > NOW() - INTERVAL ' . (int)$minutes . ' MINUTE', [$k, client_ip()]) >= $max) return true;
+    q('INSERT INTO login_attempts(email,ip) VALUES(?,?)', [$k, client_ip()]); return false;
 }
 function login_failed(string $email): void { q('INSERT INTO login_attempts(email,ip) VALUES(?,?)', [strtolower(mb_substr($email, 0, 160)), client_ip()]); }
 function login_ok(array $u, string $via = 'password'): void { q('DELETE FROM login_attempts WHERE email=?', [strtolower($u['email'])]); session_regenerate_id(true); unset($_SESSION['csrf'], $_SESSION['2fa_uid']); $_SESSION['uid'] = (int)$u['id']; $_SESSION['via'] = $via; }
@@ -597,7 +605,8 @@ function must_setup_2fa(): bool { $u = user(); return $u && is_super() && empty(
 function b32_decode(string $b): string { $a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $bits = ''; foreach (str_split(strtoupper(rtrim($b, '='))) as $c) { $v = strpos($a, $c); if ($v === false) continue; $bits .= str_pad(decbin($v), 5, '0', STR_PAD_LEFT); } $o = ''; foreach (str_split($bits, 8) as $by) if (strlen($by) === 8) $o .= chr(bindec($by)); return $o; }
 function b32_secret(): string { $a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $s = ''; foreach (str_split(random_bytes(20)) as $c) $s .= $a[ord($c) & 31]; return $s; }
 function totp_code(string $secret, int $t): string { $h = hash_hmac('sha1', pack('N*', 0, $t), b32_decode($secret), true); $o = ord($h[19]) & 15; $n = (unpack('N', substr($h, $o, 4))[1] & 0x7fffffff) % 1000000; return str_pad((string)$n, 6, '0', STR_PAD_LEFT); }
-function totp_verify(string $secret, string $code): bool { $code = preg_replace('/\D/', '', $code); if (strlen($code) !== 6 || $secret === '') return false; $t = intdiv(time(), 30); for ($i = -1; $i <= 1; $i++) if (hash_equals(totp_code($secret, $t + $i), $code)) return true; return false; }
+function totp_verify(string $secret, string $code, int $uid = 0): bool { $code = preg_replace('/\D/', '', $code); if (strlen($code) !== 6 || $secret === '') return false; $t = intdiv(time(), 30); $last = $uid ? (int)val('SELECT totp_last FROM users WHERE id=?', [$uid]) : 0;
+    for ($i = -1; $i <= 1; $i++) if ($t + $i > $last && hash_equals(totp_code($secret, $t + $i), $code)) { if ($uid) q('UPDATE users SET totp_last=? WHERE id=?', [$t + $i, $uid]); return true; } return false; }
 
 /* ---------------- Daily database backups (kept 7 days, outside public_html) ---------------- */
 define('BACKUP_DIR', dirname(__DIR__, 2) . '/lmserp-backups');

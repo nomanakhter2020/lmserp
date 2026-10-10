@@ -22,6 +22,6 @@ $top = all('SELECT c.title,COUNT(e.id) n,(SELECT COALESCE(SUM(amount),0) FROM pa
 <div class="list"><?php foreach (array_reverse($months, true) as $m => [$in, $ex, $n]): ?>
   <div class="row"><div class="grow"><b><?= date('F Y', strtotime("$m-01")) ?></b><small><?= $n ?> new enrollments · in <?= money($in) ?> · out <?= money($ex) ?></small></div><b class="<?= $in - $ex >= 0 ? 'pos' : 'neg' ?>"><?= money($in - $ex) ?></b></div>
 <?php endforeach ?></div>
-<?php if ($ecat): ?><h2>Expenses by category (6 months)</h2><div class="list"><?php foreach ($ecat as $x): ?><div class="row"><span class="mi"><?= $x['icon'] ?></span><b class="grow"><?= e($x['name']) ?></b><b class="neg"><?= money($x['t']) ?></b></div><?php endforeach ?></div><?php endif ?>
+<?php if ($ecat): ?><h2>Expenses by category (6 months)</h2><div class="list"><?php foreach ($ecat as $x): ?><div class="row"><span class="mi"><?= e($x['icon']) ?></span><b class="grow"><?= e($x['name']) ?></b><b class="neg"><?= money($x['t']) ?></b></div><?php endforeach ?></div><?php endif ?>
 <h2>Courses</h2>
 <div class="list"><?php foreach ($top as $t): ?><div class="row"><div class="grow"><b><?= e($t['title']) ?></b><small><?= $t['n'] ?> students</small></div><b><?= money($t['rev']) ?></b></div><?php endforeach ?></div>

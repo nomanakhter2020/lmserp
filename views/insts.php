@@ -6,7 +6,7 @@ $rows = all("SELECT i.*,(SELECT COUNT(*) FROM admissions a WHERE a.institution_i
 $cnt = array_column(all('SELECT status,COUNT(*) n FROM institutions GROUP BY status'), 'n', 'status');
 ?>
 <div class="stats"><a class="stat" href="?p=insts&f=pending"><b class="<?= !empty($cnt['pending']) ? 'neg' : '' ?>"><?= (int)($cnt['pending'] ?? 0) ?></b><span>Pending</span></a><a class="stat" href="?p=insts&f=active"><b><?= (int)($cnt['active'] ?? 0) ?></b><span>Live</span></a><a class="stat" href="?p=admissions"><b><?= (int)val('SELECT COUNT(*) FROM admissions') ?></b><span>Enquiries</span></a></div>
-<?php if (!mall()): ?><div class="alert">EduMall mode is off — the public website won't show institutes. Creating an institute turns it on.</div><?php endif ?>
+<?php if (!mall()): ?><div class="alert">Edition is Single Academy — the public website won't show institutes. Creating an institute switches to Multi-Vendor Academy.</div><?php endif ?>
 <details class="card guide" <?= $rows ? '' : 'open' ?>><summary>＋ Add institute</summary>
 <form method="post"><?= csrf_field() ?><input type="hidden" name="a" value="inst_create">
   <label>Institute name<input name="name" required placeholder="e.g. Bright Future School"></label>

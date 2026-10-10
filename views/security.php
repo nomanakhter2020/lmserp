@@ -20,7 +20,7 @@ $uri = 'otpauth://totp/' . rawurlencode(setting('institute', APP_NAME) . ':' . $
     <script>try{new QRCode(document.getElementById('qr'),{text:<?= json_encode($uri, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES) ?>,width:180,height:180})}catch(e){}</script>
   <?php endif ?>
 </div>
-<?php if (role('admin')): $files = is_dir(BACKUP_DIR) ? (glob(BACKUP_DIR . '/backup-*.sql.gz') ?: []) : []; rsort($files); ?>
+<?php if (is_super()): $files = is_dir(BACKUP_DIR) ? (glob(BACKUP_DIR . '/backup-*.sql.gz') ?: []) : []; rsort($files); ?>
 <div class="card">
   <h3 style="margin-top:0">💾 Database backups</h3>
   <p class="muted">A backup is made automatically every day (last 7 kept), stored outside the website folder. Download one regularly and keep it on your computer or Google Drive.</p>

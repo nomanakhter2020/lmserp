@@ -2,6 +2,8 @@
 require_role('admin', 'teacher');
 $uid = role('admin') && $id ? $id : (int)user()['id'];
 $t = one('SELECT * FROM users WHERE id=?', [$uid]);
+if ($t && ($t['staff_role'] ?? '') === 'super' && (int)$t['id'] !== (int)user()['id'] && !is_super()) $t = null;
+if ($t && (int)$t['id'] !== (int)user()['id'] && !in_array(staff_role(), ['super', 'admin'], true)) $t = null;
 if (!$t) exit('Not found');
 $pr = teacher_profile($uid);
 $title = 'Teacher profile'; $back = role('admin') && $uid !== (int)user()['id'] ? "?p=user&id=$uid" : '?p=more';
